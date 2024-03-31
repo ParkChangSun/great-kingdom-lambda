@@ -1,0 +1,38 @@
+# MyWebSocketPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref MyWebSocketFunction
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SimpleChatWebSocket}/authorizers/${MyWebSocketAuthorizer}
+  
+  # MyWebSocketRole:
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Version": "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow,
+  #           Principal:
+  #             Service:
+  #               - apigateway.amazonaws.com
+  #           Action: "sts:AssumeRole"
+  #     Policies:
+  #       - PolicyName: WebSocketInvokeLambda
+  #         PolicyDocument:
+  #           Version: "2012-10-17"
+  #           Statement: 
+  #             - Effect: Allow
+  #               Action: "lambda:InvokeFunction"
+  #               Resource: !GetAtt MyWebSocketFunction.Arn
+
+  # MyWebSocketAuthorizer:
+  #   Type: AWS::ApiGatewayV2::Authorizer
+  #   Properties:
+  #     ApiId: !Ref SimpleChatWebSocket
+  #     AuthorizerType: REQUEST
+  #     AuthorizerCredentialsArn: !GetAtt MyWebSocketRole.Arn
+  #     Name: LambdaAuthorizer
+  #     AuthorizerUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MyWebSocketFunction.Arn}/invocations
+  #     IdentitySource:
+  #       - route.request.header.Auth

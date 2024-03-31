@@ -15,40 +15,42 @@ Globals:
       - x86_64
 
 Resources:
-  SimpleChatWebSocket:
+  SimpleWebSocket:
     Type: AWS::ApiGatewayV2::Api
     Properties:
-      Name: SimpleChatWebSocket
+      Name: SimpleWebSocket
       ProtocolType: WEBSOCKET
       RouteSelectionExpression: "$request.body.action"
 
-  ConnectRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref SimpleChatWebSocket
-      RouteKey: $connect
-      Target: !Sub 'integrations/${ConnectIntegration}'
-
-  ConnectIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref SimpleChatWebSocket
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MyWebsocketFunction.Arn}/invocations'
-
-  WebSocketDeploy:
+  WebSocketDevDeploy:
     Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - WebSocketConnectRoute
     Properties:
-      ApiId: !Ref SimpleChatWebSocket
+      ApiId: !Ref SimpleWebSocket
 
-  WebSocketTestStage:
+  WebSocketDevStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
-      ApiId: !Ref SimpleChatWebSocket
-      DeploymentId: !Ref WebSocketDeploy
-      StageName: Prod
+      ApiId: !Ref SimpleWebSocket
+      DeploymentId: !Ref WebSocketDevDeploy
+      StageName: Dev
 
-  MyWebsocketFunction:
+  WebSocketConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref SimpleWebSocket
+      RouteKey: $connect
+      Target: !Sub 'integrations/${WebSocketConnectIntegration}'
+
+  WebSocketConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref SimpleWebSocket
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketConnectFunction.Arn}/invocations'
+
+  WebSocketConnectFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
@@ -60,6 +62,48 @@ Resources:
       Environment:
         Variables:
           STATEDYNAMODB: !Ref StateDynamoDB
+
+  WebSocketConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WebSocketConnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SimpleWebSocket}/*/$connect'
+
+  # DisconnectRoute:
+  #   Type: AWS::ApiGatewayV2::Route
+  #   Properties:
+  #     ApiId: !Ref SimpleChatWebSocket
+  #     RouteKey: $disconnect
+  #     Target: !Sub 'integrations/${DisconnectIntegration}'
+
+  # DisconnectIntegration:
+  #   Type: AWS::ApiGatewayV2::Integration
+  #   Properties:
+  #     ApiId: !Ref SimpleChatWebSocket
+  #     IntegrationType: AWS_PROXY
+  #     IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectFunction.Arn}/invocations'
+
+  # DisconnectFunction:
+  #   Type: AWS::Serverless::Function
+  #   Metadata:
+  #     BuildMethod: go1.x
+  #   Properties:
+  #     CodeUri: handlers/my-dis/
+  #     Policies:
+  #       - DynamoDBCrudPolicy: 
+  #           TableName: !Ref StateDynamoDB
+  #     Environment:
+  #       Variables:
+  #         STATEDYNAMODB: !Ref StateDynamoDB
+
+  # DisconnectPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref DisconnectFunction
+  #     Principal: apigateway.amazonaws.com
 
   GameMoveFunction:
     Type: AWS::Serverless::Function
