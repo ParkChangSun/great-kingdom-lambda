@@ -59,6 +59,7 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref StateDynamoDB
+        - AmazonSQSFullAccess
       Environment:
         Variables:
           STATEDYNAMODB: !Ref StateDynamoDB
@@ -70,6 +71,56 @@ Resources:
       FunctionName: !Ref WebSocketConnectFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SimpleWebSocket}/*/$connect'
+
+  WebSocketPostMessageFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/send-msg/
+      Policies:
+        - AWSLambdaSQSQueueExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SimpleWebSocket}/*"
+
+  WebSocketPostMessageQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: WebSocketPostMessageQueue.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
+
+  WebSocketPostMessageEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt WebSocketPostMessageQueue.Arn
+      FunctionName: !Ref WebSocketPostMessageFunction
+
+
+
+  WebSocketPostMessageQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref WebSocketPostMessageQueue
+      PolicyDocument:
+        Id: MyQueuePolicy
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+            Action:
+              - lambda:CreateEventSourceMapping
+              - lambda:ListEventSourceMappings
+              - lambda:ListFunctions
+            Resource:
+              - !GetAtt WebSocketPostMessageFunction
+
+
 
   # DisconnectRoute:
   #   Type: AWS::ApiGatewayV2::Route
