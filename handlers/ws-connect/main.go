@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+	"sam-app/chat"
 	"sam-app/game"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -20,16 +23,34 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	sqsClient := sqs.NewFromConfig(cfg)
-	_ = sqs.NewListQueuesPaginator(sqsClient, &sqs.ListQueuesInput{})
 	dbClient := dynamodb.NewFromConfig(cfg)
 
-	tableName := aws.String(os.Getenv("STATEDYNAMODB"))
-	t, _ := attributevalue.MarshalMap(game.WebSocketClient{Id: req.RequestContext.ConnectionID})
+	dbItem, _ := attributevalue.MarshalMap(game.WebSocketClient{Id: req.RequestContext.ConnectionID})
 	_, err = dbClient.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           tableName,
-		Item:                t,
+		TableName:           aws.String(os.Getenv("STATEDYNAMODB")),
+		Item:                dbItem,
 		ConditionExpression: aws.String("attribute_not_exists(id)"),
+	})
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
+	msgbody, err := json.Marshal(chat.Msg{
+		Timestamp: time.Now().UnixMilli(),
+		Id:        req.RequestContext.ConnectionID,
+		RoomId:    "default",
+		Chat:      "connected someone",
+	})
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
+	sqsClient := sqs.NewFromConfig(cfg)
+
+	_, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
+		QueueUrl:       aws.String(os.Getenv("QUEUE")),
+		MessageBody:    aws.String(string(msgbody)),
+		MessageGroupId: aws.String("default"),
 	})
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err

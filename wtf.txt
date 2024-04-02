@@ -36,3 +36,23 @@
   #     AuthorizerUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MyWebSocketFunction.Arn}/invocations
   #     IdentitySource:
   #       - route.request.header.Auth
+
+
+
+    # WebSocketPostMessageQueuePolicy:
+  #   Type: AWS::SQS::QueuePolicy
+  #   Properties:
+  #     Queues:
+  #       - !Ref WebSocketPostMessageQueue
+  #     PolicyDocument:
+  #       Id: MyQueuePolicy
+  #       Version: '2012-10-17'
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #           Action:
+  #             - lambda:CreateEventSourceMapping
+  #             - lambda:ListEventSourceMappings
+  #             - lambda:ListFunctions
+  #           Resource:
+  #             - !GetAtt WebSocketPostMessageFunction
