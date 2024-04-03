@@ -1,9 +1,9 @@
 package chat
 
-type Msg struct {
+type Chat struct {
 	Timestamp int64 `json:"timestamp"`
 	// UserId string?
-	Id     string `json:"id"`
-	RoomId string `json:"roomId"`
-	Chat   string `json:"chat"`
+	ConnectionId  string `json:"connectionId"`
+	GameSessionId string `json:"gameSessionId"`
+	Message       string `json:"message"`
 }

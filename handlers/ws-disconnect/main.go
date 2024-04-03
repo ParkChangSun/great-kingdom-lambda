@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
-	"log"
+	"encoding/json"
+	"fmt"
 	"os"
+	"sam-app/chat"
 	"sam-app/game"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -12,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -22,40 +26,43 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 
 	dbClient := dynamodb.NewFromConfig(cfg)
 
-	log.Print("remove ", req.RequestContext.ConnectionID)
-	dbItem, err := attributevalue.MarshalMap(game.WebSocketClient{Id: req.RequestContext.ConnectionID})
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
+	gameSessionId := "default"
+	if a, b := req.QueryStringParameters["GameSessionId"]; b {
+		gameSessionId = a
 	}
+	dbItem, _ := attributevalue.MarshalMap(game.WebSocketClient{
+		ConnectionId: req.RequestContext.ConnectionID,
+	})
 
 	_, err = dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(os.Getenv("STATEDYNAMODB")),
+		TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
 		Key:       dbItem,
 	})
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	// msgbody, err := json.Marshal(chat.Msg{
-	// 	Timestamp: time.Now().UnixMilli(),
-	// 	Id:        req.RequestContext.ConnectionID,
-	// 	RoomId:    "default",
-	// 	Chat:      "connected someone",
-	// })
-	// if err != nil {
-	// 	return events.APIGatewayProxyResponse{}, err
-	// }
+	msgbody, err := json.Marshal(chat.Chat{
+		Timestamp:     time.Now().UnixMilli(),
+		ConnectionId:  req.RequestContext.ConnectionID,
+		GameSessionId: gameSessionId,
+		Message:       fmt.Sprintf("%s has left.", req.RequestContext.ConnectionID),
+	})
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
 
-	// sqsClient := sqs.NewFromConfig(cfg)
+	sqsClient := sqs.NewFromConfig(cfg)
 
-	// _, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
-	// 	QueueUrl:       aws.String(os.Getenv("QUEUE")),
-	// 	MessageBody:    aws.String(string(msgbody)),
-	// 	MessageGroupId: aws.String("default"),
-	// })
-	// if err != nil {
-	// 	return events.APIGatewayProxyResponse{}, err
-	// }
+	_, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
+		QueueUrl:       aws.String(os.Getenv("POST_MESSAGE_QUEUE")),
+		MessageBody:    aws.String(string(msgbody)),
+		MessageGroupId: aws.String(gameSessionId),
+	})
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
 	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 }
 

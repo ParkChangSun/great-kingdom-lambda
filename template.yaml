@@ -1,9 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  sam-app
-  
-  Sample SAM Template for sam-app
+Description: Great Kingdom Serverless Backend
 
 Globals:
   Function:
@@ -26,7 +23,7 @@ Resources:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
       - WebSocketConnectRoute
-      - WebSocketDisconnectRout
+      - WebSocketDisconnectRoute
     Properties:
       ApiId: !Ref SimpleWebSocket
 
@@ -42,14 +39,6 @@ Resources:
         DataTraceEnabled: false
         ThrottlingBurstLimit: 10
         ThrottlingRateLimit: 10
-      AccessLogSettings:
-        DestinationArn: arn:aws:logs:us-east-1:309114741156:log-group:apidebug:*
-        Format: >-
-          {"requestId":"$context.requestId", "ip": "$context.identity.sourceIp",
-          "caller":"$context.identity.caller",
-          "user":"$context.identity.user","requestTime":"$context.requestTime",
-          "eventType":"$context.eventType","routeKey":"$context.routeKey",
-          "status":"$context.status","connectionId":"$context.connectionId"}
 
   WebSocketConnectRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -73,12 +62,12 @@ Resources:
       CodeUri: handlers/ws-connect/
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref StateDynamoDB
+            TableName: !Ref WebSocketConnectionDynamoDB
         - AmazonSQSFullAccess
       Environment:
         Variables:
-          STATEDYNAMODB: !Ref StateDynamoDB
-          QUEUE: !Ref WebSocketPostMessageQueue
+          CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
+          POST_MESSAGE_QUEUE: !Ref WebSocketPostMessageQueue
 
   WebSocketConnectPermission:
     Type: AWS::Lambda::Permission
@@ -87,6 +76,42 @@ Resources:
       FunctionName: !Ref WebSocketConnectFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SimpleWebSocket}/*/$connect'
+
+  WebSocketDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref SimpleWebSocket
+      RouteKey: $disconnect
+      Target: !Sub 'integrations/${WebSocketDisconnectIntegration}'
+
+  WebSocketDisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref SimpleWebSocket
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketDisconnectFunction.Arn}/invocations'
+
+  WebSocketDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/ws-disconnect/
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref WebSocketConnectionDynamoDB
+      Environment:
+        Variables:
+          CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
+          POST_MESSAGE_QUEUE: !Ref WebSocketPostMessageQueue
+
+  WebSocketDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WebSocketDisconnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SimpleWebSocket}/*/$disconnect'
 
   WebSocketPostMessageQueue:
     Type: AWS::SQS::Queue
@@ -112,46 +137,13 @@ Resources:
       Environment:
         Variables:
           API_ENDPOINT: !Sub "https://${SimpleWebSocket}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketDevStage}"
+          CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
+          POST_MESSAGE_QUEUE: !Ref WebSocketPostMessageQueue
       Events:
         WebSocketPostSQS:
           Type: SQS
           Properties:
             Queue: !GetAtt WebSocketPostMessageQueue.Arn
-
-  WebSocketDisconnectRout:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref SimpleWebSocket
-      RouteKey: $disconnect
-      Target: !Sub 'integrations/${WebSocketDisconnectIntegration}'
-
-  WebSocketDisconnectIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref SimpleWebSocket
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketDisconnectFunction.Arn}/invocations'
-
-  WebSocketDisconnectFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/ws-disconnect/
-      Policies:
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref StateDynamoDB
-      Environment:
-        Variables:
-          STATEDYNAMODB: !Ref StateDynamoDB
-
-  WebSocketDisconnectPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WebSocketDisconnectFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SimpleWebSocket}/*/$disconnect'
 
   GameMoveFunction:
     Type: AWS::Serverless::Function
@@ -161,10 +153,10 @@ Resources:
       CodeUri: handlers/game-move/
       Policies:
         - DynamoDBCrudPolicy: 
-            TableName: !Ref StateDynamoDB
+            TableName: !Ref WebSocketConnectionDynamoDB
       Environment:
         Variables:
-          STATEDYNAMODB: !Ref StateDynamoDB
+          STATEDYNAMODB: !Ref WebSocketConnectionDynamoDB
       Events:
         CatchAll:
           Type: Api
@@ -172,18 +164,26 @@ Resources:
             Path: /move
             Method: GET
 
-  StateDynamoDB:
+  WebSocketConnectionDynamoDB:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-        - AttributeName: "id"
+        - AttributeName: ConnectionId
+          AttributeType: "S"
+        - AttributeName: GameSessionId
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "id"
+        - AttributeName: ConnectionId
           KeyType: "HASH"
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
+      GlobalSecondaryIndexes:
+        - IndexName: ByGameSessionId
+          KeySchema:
+            - AttributeName: GameSessionId
+              KeyType: "HASH"
+          Projection: 
+            NonKeyAttributes: 
+              - UserId
+      BillingMode: PAY_PER_REQUEST
 
 # Outputs:
 #   api:
