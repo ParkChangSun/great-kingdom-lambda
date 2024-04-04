@@ -29,6 +29,7 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 	if err != nil {
 		return err
 	}
+	log.Print(payload)
 
 	dbClient := dynamodb.NewFromConfig(cfg)
 
@@ -41,6 +42,7 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 	queryOutput, err := dbClient.Query(ctx, &dynamodb.QueryInput{
 		TableName:                 aws.String(os.Getenv("CONNECTION_DYNAMODB")),
 		IndexName:                 aws.String("ByGameSessionId"),
+		ExpressionAttributeNames:  expr.Names(),
 		KeyConditionExpression:    expr.KeyCondition(),
 		ExpressionAttributeValues: expr.Values(),
 	})
@@ -49,7 +51,7 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 	}
 
 	connections := []game.WebSocketClient{}
-	err = attributevalue.UnmarshalListOfMaps(queryOutput.Items, connections)
+	err = attributevalue.UnmarshalListOfMaps(queryOutput.Items, &connections)
 	if err != nil {
 		return err
 	}

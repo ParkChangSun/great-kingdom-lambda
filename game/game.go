@@ -6,6 +6,9 @@ type WebSocketClient struct {
 	UserId        string
 }
 
+type GameSession struct {
+	GameSessionId string
+}
 type CellStatus int
 
 const (

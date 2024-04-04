@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sam-app/chat"
 	"sam-app/game"
@@ -15,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
@@ -26,26 +28,32 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 
 	dbClient := dynamodb.NewFromConfig(cfg)
 
-	gameSessionId := "default"
-	if a, b := req.QueryStringParameters["GameSessionId"]; b {
-		gameSessionId = a
-	}
-	dbItem, _ := attributevalue.MarshalMap(game.WebSocketClient{
-		ConnectionId: req.RequestContext.ConnectionID,
-	})
+	log.Print(req)
 
-	_, err = dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
-		Key:       dbItem,
+	// gameSessionId := "default"
+	// if a, b := req.QueryStringParameters["GameSessionId"]; b {
+	// 	gameSessionId = a
+	// }
+	dbItem, _ := attributevalue.MarshalMap(struct {
+		ConnectionId string
+	}{req.RequestContext.ConnectionID})
+
+	out, err := dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName:    aws.String(os.Getenv("CONNECTION_DYNAMODB")),
+		Key:          dbItem,
+		ReturnValues: types.ReturnValueAllOld,
 	})
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
+	outobj := game.WebSocketClient{}
+	attributevalue.UnmarshalMap(out.Attributes, &outobj)
+
 	msgbody, err := json.Marshal(chat.Chat{
 		Timestamp:     time.Now().UnixMilli(),
 		ConnectionId:  req.RequestContext.ConnectionID,
-		GameSessionId: gameSessionId,
+		GameSessionId: outobj.GameSessionId,
 		Message:       fmt.Sprintf("%s has left.", req.RequestContext.ConnectionID),
 	})
 	if err != nil {
@@ -57,7 +65,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	_, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:       aws.String(os.Getenv("POST_MESSAGE_QUEUE")),
 		MessageBody:    aws.String(string(msgbody)),
-		MessageGroupId: aws.String(gameSessionId),
+		MessageGroupId: aws.String(outobj.GameSessionId),
 	})
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err

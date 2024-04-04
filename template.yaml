@@ -98,6 +98,7 @@ Resources:
     Properties:
       CodeUri: handlers/ws-disconnect/
       Policies:
+        - AmazonSQSFullAccess
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
       Environment:
@@ -128,6 +129,8 @@ Resources:
       CodeUri: handlers/send-msg/
       Policies:
         - AWSLambdaSQSQueueExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WebSocketConnectionDynamoDB
         - Statement:
             - Effect: Allow
               Action:
@@ -183,6 +186,7 @@ Resources:
           Projection: 
             NonKeyAttributes: 
               - UserId
+            ProjectionType: INCLUDE
       BillingMode: PAY_PER_REQUEST
 
 # Outputs:
