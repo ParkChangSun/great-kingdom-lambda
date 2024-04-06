@@ -1,5 +1,7 @@
 # sam-app
 
+error handling process join
+
 This is a sample template for sam-app - Below is a brief explanation of what we have generated for you:
 
 ```bash

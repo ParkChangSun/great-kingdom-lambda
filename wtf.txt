@@ -38,21 +38,97 @@
   #       - route.request.header.Auth
 
 
+    WebSocketConnectionDynamoDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: ConnectionId
+          AttributeType: "S"
+        - AttributeName: GameSessionId
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: ConnectionId
+          KeyType: "HASH"
+      GlobalSecondaryIndexes:
+        - IndexName: ByGameSessionId
+          KeySchema:
+            - AttributeName: GameSessionId
+              KeyType: "HASH"
+          Projection: 
+            NonKeyAttributes: 
+              - UserId
+            ProjectionType: INCLUDE
+      BillingMode: PAY_PER_REQUEST
 
-    # WebSocketPostMessageQueuePolicy:
-  #   Type: AWS::SQS::QueuePolicy
-  #   Properties:
-  #     Queues:
-  #       - !Ref WebSocketPostMessageQueue
-  #     PolicyDocument:
-  #       Id: MyQueuePolicy
-  #       Version: '2012-10-17'
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal:
-  #           Action:
-  #             - lambda:CreateEventSourceMapping
-  #             - lambda:ListEventSourceMappings
-  #             - lambda:ListFunctions
-  #           Resource:
-  #             - !GetAtt WebSocketPostMessageFunction
+
+	dbItem, _ := attributevalue.MarshalMap(game.WebSocketClient{
+		ConnectionId:  req.RequestContext.ConnectionID,
+		GameSessionId: gameSessionId,
+		UserId:        "header-required",
+	})
+	_, err = dbClient.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName:           aws.String(os.Getenv("CONNECTION_DYNAMODB")),
+		Item:                dbItem,
+		ConditionExpression: aws.String("attribute_not_exists(id)"),
+	})
+
+
+
+{Resource: 
+Path: 
+HTTPMethod: 
+Headers:map[
+    Host:omlo79fwk8.execute-api.us-east-1.amazonaws.com 
+    X-Forwarded-For: 
+    x-api-key: 
+    x-restapi:
+]
+MultiValueHeaders:map[
+    Host:[omlo79fwk8.execute-api.us-east-1.amazonaws.com] 
+    X-Forwarded-For:[] 
+    x-api-key:[] 
+    x-restapi:[]
+] 
+QueryStringParameters:map[] 
+MultiValueQueryStringParameters:map[] 
+PathParameters:map[] 
+StageVariables:map[] 
+RequestContext:{
+    AccountID: 
+    ResourceID: 
+    Stage:Dev 
+    RequestID:V0IJFF-jIAMFmIQ= 
+    Identity:{
+        CognitoIdentityPoolID: 
+        AccountID: 
+        CognitoIdentityID: 
+        Caller: 
+        APIKey: 
+        APIKeyID: 
+        AccessKey: 
+        SourceIP:220.70.42.35 
+        CognitoAuthenticationType: 
+        CognitoAuthenticationProvider: 
+        UserArn: 
+        UserAgent: 
+        User:
+    } 
+    ResourcePath: 
+    Authorizer:<nil> 
+    HTTPMethod: 
+    APIID:omlo79fwk8 
+    ConnectedAt:1712424631834 
+    ConnectionID:V0H8xfjDoAMCKFg= 
+    DomainName:omlo79fwk8.execute-api.us-east-1.amazonaws.com 
+    Error: 
+    EventType:DISCONNECT 
+    ExtendedRequestID:V0IJFF-jIAMFmIQ= 
+    IntegrationLatency: 
+    MessageDirection:IN 
+    MessageID:<nil> 
+    RequestTime:06/Apr/2024:17:31:50 +0000 
+    RequestTimeEpoch:1712424710635 
+    RouteKey:$disconnect 
+    Status:
+} 
+Body: IsBase64Encoded:false}
