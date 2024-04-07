@@ -22,8 +22,14 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
+	move := game.Move{}
+	err = json.Unmarshal([]byte(req.Body), &move)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
 	dbClient := dynamodb.NewFromConfig(cfg)
-	query, err := dbClient.GetItem(ctx, &dynamodb.GetItemInput{
+	out, err := dbClient.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
 		Key:       game.GetConnectionDynamoDBKey(req.RequestContext.ConnectionID),
 	})
@@ -31,18 +37,23 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	record := game.ConnectionDDBItem{}
-	attributevalue.UnmarshalMap(query.Item, &record)
-	record.Timestamp = req.RequestContext.RequestTimeEpoch
+	item := game.ConnectionDDBItem{}
+	attributevalue.UnmarshalMap(out.Item, &item)
 
-	msgbody, _ := json.Marshal(record)
+	msgbody, _ := json.Marshal(game.GameMoveSQSRecord{
+		Timestamp:     req.RequestContext.RequestTimeEpoch,
+		ConnectionId:  req.RequestContext.ConnectionID,
+		GameSessionId: item.GameSessionId,
+		Move:          move,
+	})
+
 	sqsClient := sqs.NewFromConfig(cfg)
 	_, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:       aws.String(os.Getenv("POST_MESSAGE_QUEUE")),
 		MessageBody:    aws.String(string(msgbody)),
-		MessageGroupId: aws.String(record.GameSessionId),
+		MessageGroupId: aws.String(item.GameSessionId),
 		MessageAttributes: map[string]types.MessageAttributeValue{
-			"EventType": {DataType: aws.String("String"), StringValue: aws.String(game.LEAVEEVENT)},
+			"EventType": {DataType: aws.String("String"), StringValue: aws.String(game.GAMEEVENT)},
 		},
 	})
 	if err != nil {

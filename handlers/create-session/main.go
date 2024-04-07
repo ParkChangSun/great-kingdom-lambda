@@ -32,7 +32,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 	item, _ := attributevalue.MarshalMap(game.GameSession{
 		GameSessionId:   uuid.New().String(),
-		GameSessionName: req.Body,
+		GameSessionName: body.GameSessionName,
 	})
 	dbClient.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),

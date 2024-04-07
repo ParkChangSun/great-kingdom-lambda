@@ -20,7 +20,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	msgbody, _ := json.Marshal(game.JoinRecord{
+	msgbody, _ := json.Marshal(game.ConnectionDDBItem{
 		ConnectionId:  req.RequestContext.ConnectionID,
 		Timestamp:     req.RequestContext.RequestTimeEpoch,
 		GameSessionId: req.QueryStringParameters["GameSessionId"],

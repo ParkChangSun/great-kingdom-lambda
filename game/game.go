@@ -9,7 +9,16 @@ const (
 	JOINEVENT  = "JOIN"
 	LEAVEEVENT = "LEAVE"
 	CHATEVENT  = "CHAT"
+	GAMEEVENT  = "GAME"
 )
+
+type ServerToClient struct {
+	EventType string
+	Chat      string
+	Game
+	Players            []User
+	CurrentConnections []User
+}
 
 type User struct {
 	ConnectionId string
@@ -21,7 +30,7 @@ type GameSession struct {
 	GameSessionName    string
 	CurrentConnections []User
 	Players            []User
-	// Game
+	Game               Game
 }
 
 func GetGameSessionDynamoDBKey(gameSessionId string) map[string]types.AttributeValue {

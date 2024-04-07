@@ -31,10 +31,9 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 
 	for _, record := range req.Records {
 		eventType := aws.ToString(record.MessageAttributes["EventType"].StringValue)
-		log.Print("eventtype:", eventType)
 		switch eventType {
 		case game.JOINEVENT:
-			msg := game.JoinRecord{}
+			msg := game.ConnectionDDBItem{}
 			json.Unmarshal([]byte(record.Body), &msg)
 
 			item, _ := attributevalue.MarshalMap(msg)
@@ -43,16 +42,10 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				return err
 			}
 
-			out, err := dbClient.GetItem(ctx, &dynamodb.GetItemInput{
-				TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-				Key:       game.GetGameSessionDynamoDBKey(msg.GameSessionId),
-			})
+			gameSession, err := game.GetGameSession(ctx, msg.GameSessionId)
 			if err != nil {
 				return err
 			}
-
-			gameSession := game.GameSession{}
-			attributevalue.UnmarshalMap(out.Item, &gameSession)
 
 			gameSession.CurrentConnections = append(gameSession.CurrentConnections, game.User{ConnectionId: msg.ConnectionId, UserId: msg.UserId})
 			if len(gameSession.Players) < 2 {
@@ -62,24 +55,36 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			item, _ = attributevalue.MarshalMap(gameSession)
 			dbClient.PutItem(ctx, &dynamodb.PutItemInput{TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")), Item: item})
 
-			data, _ := json.Marshal(struct {
-				EventType string
-				Chat      string
-			}{
-				game.CHATEVENT,
-				fmt.Sprintf("%s has joined the game.", msg.ConnectionId),
+			joinData, _ := json.Marshal(game.ServerToClient{
+				EventType:          game.JOINEVENT,
+				Players:            gameSession.Players,
+				CurrentConnections: gameSession.CurrentConnections,
+				Chat:               fmt.Sprintf("%s has joined the game.", msg.ConnectionId),
 			})
 			for _, c := range gameSession.CurrentConnections {
 				_, err = wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
 					ConnectionId: aws.String(c.ConnectionId),
-					Data:         data,
+					Data:         joinData,
 				})
 				if err != nil {
 					log.Print(err)
 				}
 			}
+
+			gameData, _ := json.Marshal(game.ServerToClient{
+				EventType: game.GAMEEVENT,
+				Game:      gameSession.Game,
+			})
+			_, err = wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
+				ConnectionId: aws.String(msg.ConnectionId),
+				Data:         gameData,
+			})
+			if err != nil {
+				log.Print(err)
+			}
+
 		case game.LEAVEEVENT:
-			msg := game.JoinRecord{}
+			msg := game.ConnectionDDBItem{}
 			json.Unmarshal([]byte(record.Body), &msg)
 
 			_, err = dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
@@ -90,18 +95,10 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				return err
 			}
 
-			out, err := dbClient.GetItem(ctx, &dynamodb.GetItemInput{
-				TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-				Key:       game.GetGameSessionDynamoDBKey(msg.GameSessionId),
-			})
+			gameSession, err := game.GetGameSession(ctx, msg.GameSessionId)
 			if err != nil {
 				return err
 			}
-
-			gameSession := game.GameSession{}
-			attributevalue.UnmarshalMap(out.Item, &gameSession)
-
-			log.Printf("%+v\n", gameSession)
 
 			gameSession.CurrentConnections = slices.DeleteFunc(gameSession.CurrentConnections, func(u game.User) bool {
 				return u.ConnectionId == msg.ConnectionId
@@ -125,21 +122,46 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 					Item:      item,
 				})
 
-				data := struct {
-					EventType string
-					Chat      string
-				}{game.CHATEVENT, fmt.Sprintf("%s has left the game.", msg.ConnectionId)}
-				databyte, _ := json.Marshal(data)
+				leaveData, _ := json.Marshal(game.ServerToClient{
+					EventType:          game.LEAVEEVENT,
+					Players:            gameSession.Players,
+					CurrentConnections: gameSession.CurrentConnections,
+					Chat:               fmt.Sprintf("%s has left the game.", msg.ConnectionId),
+				})
 				for _, c := range gameSession.CurrentConnections {
 					_, err = wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
 						ConnectionId: aws.String(c.ConnectionId),
-						Data:         []byte(databyte),
+						Data:         leaveData,
 					})
 					if err != nil {
 						log.Print(err)
 					}
 				}
 			}
+
+		case game.GAMEEVENT:
+			msg := game.GameMoveSQSRecord{}
+			json.Unmarshal([]byte(record.Body), &msg)
+
+			out, err := dbClient.GetItem(ctx, &dynamodb.GetItemInput{
+				TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
+				Key:       game.GetGameSessionDynamoDBKey(msg.GameSessionId),
+			})
+			if err != nil {
+				return err
+			}
+
+			gameSession := game.GameSession{}
+			attributevalue.UnmarshalMap(out.Item, &gameSession)
+
+			if !gameSession.Game.Playing || gameSession.Players[gameSession.Game.Turn].ConnectionId != msg.ConnectionId {
+				return nil
+			}
+
+			// game logic
+			// check territory, sieged
+
+			// send game event to client
 		}
 	}
 
@@ -149,52 +171,3 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 func main() {
 	lambda.Start(handler)
 }
-
-// update := expression.Set(expression.Name("GameSessionId"), expression.Value(sessionId))
-// 	expr, err := expression.NewBuilder().WithUpdate(update).Build()
-
-// 	dbClient := dynamodb.NewFromConfig(cfg)
-// 	out, err := dbClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-// 		TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
-// 	})
-// 	if err != nil {
-// 		return events.APIGatewayProxyResponse{}, err
-// 	}
-
-// 	msgbody, err := json.Marshal(game.Chat{
-// 		Timestamp:     time.Now().UnixMilli(),
-// 		ConnectionId:  req.RequestContext.ConnectionID,
-// 		GameSessionId: sessionId,
-// 		Message:       fmt.Sprintf("%s has joined.", req.RequestContext.ConnectionID),
-// 	})
-// 	if err != nil {
-// 		return events.APIGatewayProxyResponse{}, err
-// 	}
-
-// dbClient := dynamodb.NewFromConfig(cfg)
-
-// dbItem, _ := attributevalue.MarshalMap(struct {
-// 	ConnectionId string
-// }{req.RequestContext.ConnectionID})
-
-// out, err := dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-// 	TableName:    aws.String(os.Getenv("CONNECTION_DYNAMODB")),
-// 	Key:          dbItem,
-// 	ReturnValues: types.ReturnValueAllOld,
-// })
-// if err != nil {
-// 	return events.APIGatewayProxyResponse{}, err
-// }
-
-// outobj := game.WebSocketClient{}
-// attributevalue.UnmarshalMap(out.Attributes, &outobj)
-
-// msgbody, err := json.Marshal(chat.Chat{
-// 	Timestamp:     time.Now().UnixMilli(),
-// 	ConnectionId:  req.RequestContext.ConnectionID,
-// 	GameSessionId: outobj.GameSessionId,
-// 	Message:       fmt.Sprintf("%s has left.", req.RequestContext.ConnectionID),
-// })
-// if err != nil {
-// 	return events.APIGatewayProxyResponse{}, err
-// }
