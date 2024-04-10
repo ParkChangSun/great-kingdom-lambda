@@ -30,7 +30,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
-	item, _ := attributevalue.MarshalMap(game.GameSession{
+	item, _ := attributevalue.MarshalMap(game.GameSessionDDBItem{
 		GameSessionId:   uuid.New().String(),
 		GameSessionName: body.GameSessionName,
 	})

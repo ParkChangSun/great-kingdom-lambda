@@ -1,13 +1,25 @@
-게임 데이터 넣을 거면 putitem대신 업데이트 하고 업데이트 한 부분만 익스프레션 빌드
-goneerror 처리
+체스닷컴에서는 상대가 움직인 수를 따로 보여주기만 하는데
+채팅을 보여줄 필요가 없을듯?
 
 웹소켓 클라이언트에 메시지 보낼때 다보내게되는데... 그냥 분리할까?
 
-websocket단에서 현재 플레이어 인식? 아니면 큐 핸들러에서? -> 턴이 아니면 그냥 버려도 되잖아? 그럼노상관인데? 게임중아닐때도
-
-userid 좀 킹받네
-
 getitem 결과 없을때 처리
+
+이벤트 메시지 보내기 전에 업데이트하는게 맞긴한데 귀찮아
+
+게임시작 일단 수 두는 메시지(move)에 담아놓음
+
+
+
+넘긴거
+config에러 처리 무시
+
+나아중에해볼거
+dynamodb transactions
+수많은 에러 핸들링 - 핸들러에서 에러 발생하면 메시지로 알려줘야함
+잘못된 리퀘스트 오면 새로고침 시키기?
+게임 데이터 저장
+게임 데이터와 채팅 데이터는 굳이 동기 적으로 할필요 없다(진짜쓸모없네)
 
 
 # MyWebSocketPermission:
@@ -196,4 +208,63 @@ websocket custom route
     "status": ""
   },
   "body": "{\"action\":\"move\"}"
+}
+
+func gameEvent(ctx context.Context, msg game.GameMoveSQSRecord) error {
+	// gamestartevent gamemoveevent gamefinishevent
+
+	gameSession, err := game.GetGameSession(ctx, msg.GameSessionId)
+	if err != nil {
+		return err
+	}
+
+	if !gameSession.Game.Playing || gameSession.Game.PlayersId[gameSession.Game.Turn] != msg.UserId {
+		return nil
+	}
+
+	if msg.Move.Pass {
+		if gameSession.Game.Pass() {
+			var c string
+			if b, o := gameSession.Game.CountTerritory(); b > o {
+				c = fmt.Sprint("Game over. ", gameSession.Game.PlayersId[0], " won.")
+			} else if b < o {
+				c = fmt.Sprint("Game over. ", gameSession.Game.PlayersId[1], " won.")
+			} else {
+				c = fmt.Sprint("Game over. Draw.")
+			}
+			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+				EventType: game.GAMEEVENT,
+				Game:      gameSession.Game,
+				Chat:      c,
+			})
+		} else {
+			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+				EventType: game.GAMEEVENT,
+				Game:      gameSession.Game,
+			})
+		}
+	} else {
+		finished, err := gameSession.Game.Move(msg.Move.Point)
+		if err != nil {
+			return err
+		}
+		gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+			EventType: game.GAMEEVENT,
+			Game:      gameSession.Game,
+		})
+		if finished {
+			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+				EventType: game.GAMEEVENT,
+				Game:      gameSession.Game,
+				Chat:      fmt.Sprint("Game over. ", gameSession.Game.PlayersId[gameSession.Turn%2], " won."),
+			})
+		}
+	}
+
+	err = gameSession.UpdateGame(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -30,8 +30,7 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 	})
 
 	for _, record := range req.Records {
-		eventType := aws.ToString(record.MessageAttributes["EventType"].StringValue)
-		switch eventType {
+		switch aws.ToString(record.MessageAttributes["EventType"].StringValue) {
 		case game.JOINEVENT:
 			msg := game.ConnectionDDBItem{}
 			json.Unmarshal([]byte(record.Body), &msg)
@@ -52,24 +51,17 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				gameSession.Players = append(gameSession.Players, game.User{ConnectionId: msg.ConnectionId, UserId: msg.UserId})
 			}
 
-			item, _ = attributevalue.MarshalMap(gameSession)
-			dbClient.PutItem(ctx, &dynamodb.PutItemInput{TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")), Item: item})
+			err = gameSession.UpdatePlayers(ctx)
+			if err != nil {
+				return err
+			}
 
-			joinData, _ := json.Marshal(game.ServerToClient{
+			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
 				EventType:          game.JOINEVENT,
 				Players:            gameSession.Players,
 				CurrentConnections: gameSession.CurrentConnections,
 				Chat:               fmt.Sprintf("%s has joined the game.", msg.ConnectionId),
 			})
-			for _, c := range gameSession.CurrentConnections {
-				_, err = wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
-					ConnectionId: aws.String(c.ConnectionId),
-					Data:         joinData,
-				})
-				if err != nil {
-					log.Print(err)
-				}
-			}
 
 			gameData, _ := json.Marshal(game.ServerToClient{
 				EventType: game.GAMEEVENT,
@@ -116,52 +108,101 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 					return err
 				}
 			} else {
-				item, _ := attributevalue.MarshalMap(gameSession)
-				dbClient.PutItem(ctx, &dynamodb.PutItemInput{
-					TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-					Item:      item,
-				})
+				err = gameSession.UpdatePlayers(ctx)
+				if err != nil {
+					return err
+				}
 
-				leaveData, _ := json.Marshal(game.ServerToClient{
+				gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
 					EventType:          game.LEAVEEVENT,
 					Players:            gameSession.Players,
 					CurrentConnections: gameSession.CurrentConnections,
 					Chat:               fmt.Sprintf("%s has left the game.", msg.ConnectionId),
 				})
-				for _, c := range gameSession.CurrentConnections {
-					_, err = wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
-						ConnectionId: aws.String(c.ConnectionId),
-						Data:         leaveData,
-					})
-					if err != nil {
-						log.Print(err)
-					}
-				}
 			}
 
 		case game.GAMEEVENT:
+			// gamestartevent gamemoveevent gamefinishevent
 			msg := game.GameMoveSQSRecord{}
 			json.Unmarshal([]byte(record.Body), &msg)
 
-			out, err := dbClient.GetItem(ctx, &dynamodb.GetItemInput{
-				TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-				Key:       game.GetGameSessionDynamoDBKey(msg.GameSessionId),
-			})
+			gameSession, err := game.GetGameSession(ctx, msg.GameSessionId)
 			if err != nil {
 				return err
 			}
 
-			gameSession := game.GameSession{}
-			attributevalue.UnmarshalMap(out.Item, &gameSession)
-
-			if !gameSession.Game.Playing || gameSession.Players[gameSession.Game.Turn].ConnectionId != msg.ConnectionId {
+			if msg.Move.Start && msg.ConnectionId == gameSession.Players[0].ConnectionId && !gameSession.Game.Playing {
+				gameSession.StartNewGame(gameSession.Players[0].UserId, gameSession.Players[1].UserId)
+				err = gameSession.UpdateGame(ctx)
+				if err != nil {
+					return err
+				}
 				return nil
 			}
 
-			// game logic
-			// check territory, sieged
+			if !gameSession.Game.Playing || gameSession.Game.PlayersId[gameSession.Game.Turn] != msg.UserId {
+				return nil
+			}
 
-			// send game event to client
+			if msg.Move.Pass {
+				if gameSession.Game.Pass() {
+					var c string
+					if b, o := gameSession.Game.CountTerritory(); b > o {
+						c = fmt.Sprint("Game over. ", gameSession.Game.PlayersId[0], " won.")
+					} else if b < o {
+						c = fmt.Sprint("Game over. ", gameSession.Game.PlayersId[1], " won.")
+					} else {
+						c = "Game over. Draw."
+					}
+					gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+						EventType: game.GAMEEVENT,
+						Game:      gameSession.Game,
+						Chat:      c,
+					})
+				} else {
+					gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+						EventType: game.GAMEEVENT,
+						Game:      gameSession.Game,
+					})
+				}
+			} else {
+				finished, err := gameSession.Game.Move(msg.Move.Point)
+				if err != nil {
+					return err
+				}
+
+				if finished {
+					gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+						EventType: game.GAMEEVENT,
+						Game:      gameSession.Game,
+						Chat:      fmt.Sprint("Game over. ", gameSession.Game.PlayersId[gameSession.Game.Turn%2], " won."),
+					})
+				} else {
+					gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+						EventType: game.GAMEEVENT,
+						Game:      gameSession.Game,
+					})
+				}
+			}
+
+			err = gameSession.UpdateGame(ctx)
+			if err != nil {
+				return err
+			}
+
+		case game.CHATEVENT:
+			msg := game.GameChatSQSRecord{}
+			json.Unmarshal([]byte(record.Body), &msg)
+
+			gameSession, err := game.GetGameSession(ctx, msg.GameSessionId)
+			if err != nil {
+				return err
+			}
+
+			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+				EventType: game.CHATEVENT,
+				Chat:      msg.Chat,
+			})
 		}
 	}
 

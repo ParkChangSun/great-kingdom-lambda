@@ -143,6 +143,43 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/move'
 
+  WebSocketChatRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: chat
+      Target: !Sub 'integrations/${WebSocketChatIntegration}'
+
+  WebSocketChatIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketChatFunction.Arn}/invocations'
+
+  WebSocketChatFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/ws-game-move/
+      Policies:
+        - AmazonSQSFullAccess
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref WebSocketConnectionDynamoDB
+      Environment:
+        Variables:
+          CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
+          POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
+
+  WebSocketChatPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WebSocketChatFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/chat'
+
   WebSocketEventQueue:
     Type: AWS::SQS::Queue
     Properties:

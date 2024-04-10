@@ -10,8 +10,6 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
@@ -28,21 +26,15 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	dbClient := dynamodb.NewFromConfig(cfg)
-	out, err := dbClient.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
-		Key:       game.GetConnectionDynamoDBKey(req.RequestContext.ConnectionID),
-	})
+	item, err := game.GetConnection(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	item := game.ConnectionDDBItem{}
-	attributevalue.UnmarshalMap(out.Item, &item)
-
 	msgbody, _ := json.Marshal(game.GameMoveSQSRecord{
 		Timestamp:     req.RequestContext.RequestTimeEpoch,
-		ConnectionId:  req.RequestContext.ConnectionID,
+		ConnectionId:  item.ConnectionId,
+		UserId:        item.UserId,
 		GameSessionId: item.GameSessionId,
 		Move:          move,
 	})

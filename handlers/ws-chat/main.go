@@ -20,20 +20,34 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	record, err := game.GetConnection(ctx, req.RequestContext.ConnectionID)
+	chat := struct {
+		Chat string
+	}{}
+	err = json.Unmarshal([]byte(req.Body), &chat)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
-	record.Timestamp = req.RequestContext.RequestTimeEpoch
 
-	msgbody, _ := json.Marshal(record)
+	item, err := game.GetConnection(ctx, req.RequestContext.ConnectionID)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
+	msgbody, _ := json.Marshal(game.GameChatSQSRecord{
+		Timestamp:     req.RequestContext.RequestTimeEpoch,
+		ConnectionId:  item.ConnectionId,
+		UserId:        item.UserId,
+		GameSessionId: item.GameSessionId,
+		Chat:          chat.Chat,
+	})
+
 	sqsClient := sqs.NewFromConfig(cfg)
 	_, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:       aws.String(os.Getenv("POST_MESSAGE_QUEUE")),
 		MessageBody:    aws.String(string(msgbody)),
-		MessageGroupId: aws.String(record.GameSessionId),
+		MessageGroupId: aws.String(item.GameSessionId),
 		MessageAttributes: map[string]types.MessageAttributeValue{
-			"EventType": {DataType: aws.String("String"), StringValue: aws.String(game.LEAVEEVENT)},
+			"EventType": {DataType: aws.String("String"), StringValue: aws.String(game.CHATEVENT)},
 		},
 	})
 	if err != nil {
