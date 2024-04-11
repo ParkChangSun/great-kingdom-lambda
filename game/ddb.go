@@ -158,6 +158,12 @@ func GetConnection(ctx context.Context, connectionId string) (ConnectionDDBItem,
 	return record, nil
 }
 
+type UserDDBItem struct {
+	UserUUID     string
+	UserId       string
+	PasswordHash string
+}
+
 type GameMoveSQSRecord struct {
 	Timestamp     int64
 	ConnectionId  string

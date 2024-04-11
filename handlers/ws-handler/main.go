@@ -60,7 +60,7 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				EventType:          game.JOINEVENT,
 				Players:            gameSession.Players,
 				CurrentConnections: gameSession.CurrentConnections,
-				Chat:               fmt.Sprintf("%s has joined the game.", msg.ConnectionId),
+				Chat:               fmt.Sprint(msg.ConnectionId, " has joined the game."),
 			})
 
 			gameData, _ := json.Marshal(game.ServerToClient{
@@ -117,7 +117,7 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 					EventType:          game.LEAVEEVENT,
 					Players:            gameSession.Players,
 					CurrentConnections: gameSession.CurrentConnections,
-					Chat:               fmt.Sprintf("%s has left the game.", msg.ConnectionId),
+					Chat:               fmt.Sprintf(msg.ConnectionId, " has left the game."),
 				})
 			}
 
