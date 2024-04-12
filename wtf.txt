@@ -13,6 +13,10 @@ getitem 결과 없을때 처리
 
 
 
+해야되는거
+secure cookie
+cors
+
 넘긴거
 config에러 처리 무시
 
@@ -270,3 +274,10 @@ func gameEvent(ctx context.Context, msg game.GameMoveSQSRecord) error {
 
 	return nil
 }
+
+      DefaultRouteSettings:
+        DetailedMetricsEnabled: true
+        LoggingLevel: INFO
+        DataTraceEnabled: false
+        ThrottlingBurstLimit: 10
+        ThrottlingRateLimit: 10

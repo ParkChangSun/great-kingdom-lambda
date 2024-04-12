@@ -32,12 +32,6 @@ Resources:
       ApiId: !Ref WebSocketApi
       StageName: Dev
       AutoDeploy: true
-      DefaultRouteSettings:
-        DetailedMetricsEnabled: true
-        LoggingLevel: INFO
-        DataTraceEnabled: false
-        ThrottlingBurstLimit: 10
-        ThrottlingRateLimit: 10
 
   WebSocketConnectRoute:
     Type: AWS::ApiGatewayV2::Route

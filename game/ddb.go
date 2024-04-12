@@ -164,6 +164,23 @@ type UserDDBItem struct {
 	PasswordHash string
 }
 
+func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
+	item := UserDDBItem{}
+	cfg, _ := config.LoadDefaultConfig(ctx)
+
+	k, _ := attributevalue.MarshalMap(struct{ UserId string }{UserId: userId})
+	query, err := dynamodb.NewFromConfig(cfg).GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(os.Getenv("USER_DYNAMODB")),
+		Key:       k,
+	})
+	if err != nil {
+		return item, err
+	}
+
+	attributevalue.UnmarshalMap(query.Item, &item)
+	return item, nil
+}
+
 type GameMoveSQSRecord struct {
 	Timestamp     int64
 	ConnectionId  string

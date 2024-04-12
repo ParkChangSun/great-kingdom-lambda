@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"regexp"
 	"sam-app/game"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -28,13 +29,21 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}{}
 	json.Unmarshal([]byte(req.Body), &body)
 
-	// getitem 값없을때 에러인가? 어쨌든 중복 처리
-	// 72 byte limit 처리 최소값 한 6자리 정도 처리
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
+	user, err := game.GetUser(ctx, body.Id)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
+	if user.UserId != "" {
+		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "id exists", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
+	}
+
+	num := regexp.MustCompile(`.*[0-9]`)
+	eng := regexp.MustCompile(`.*[a-zA-Z]`)
+	bytelen := regexp.MustCompile(`^.{6,30}$`)
+	if !num.Match([]byte(body.Password)) || !eng.Match([]byte(body.Password)) || !bytelen.Match([]byte(body.Password)) {
+		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "password invalid", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
+	}
+	hash, _ := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
 
 	data, _ := attributevalue.MarshalMap(game.UserDDBItem{
 		UserUUID:     uuid.NewString(),
@@ -49,7 +58,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	return events.APIGatewayProxyResponse{StatusCode: 201}, nil
+	return events.APIGatewayProxyResponse{StatusCode: 201, Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
 }
 
 func main() {
