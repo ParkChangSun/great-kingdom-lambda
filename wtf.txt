@@ -3,22 +3,19 @@
 
 웹소켓 클라이언트에 메시지 보낼때 다보내게되는데... 그냥 분리할까?
 
-getitem 결과 없을때 처리
-
 이벤트 메시지 보내기 전에 업데이트하는게 맞긴한데 귀찮아
 
-게임시작 일단 수 두는 메시지(move)에 담아놓음
 
-패스워드 72바이트 제한
 
 
 
 해야되는거
-secure cookie
+secure samesite cookie
 cors
 
 넘긴거
 config에러 처리 무시
+게임시작 일단 수 두는 메시지(move)에 담아놓음
 
 나아중에해볼거
 dynamodb transactions

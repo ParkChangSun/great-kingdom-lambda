@@ -33,12 +33,14 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "incorrect password", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
 	}
 
-	type AuthTokenClaims struct {
-		jwt.RegisteredClaims
-		UserId    string
-		Timestamp int64
+	t := game.AuthTokenClaims{
+		UserId: item.UserId,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: &jwt.NumericDate{
+				Time: time.Now().Add(time.Minute * 15),
+			},
+		},
 	}
-	t := AuthTokenClaims{UserId: item.UserId, Timestamp: time.Now().UnixMilli()}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, t)
 	tstr, err := token.SignedString([]byte("key"))
 	if err != nil {
@@ -48,11 +50,9 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers: map[string]string{
-			"Set-Cookie":                       fmt.Sprint("GreatKingdomAuth=bearer ", tstr, ";"),
+			"Set-Cookie":                       fmt.Sprint("GreatKingdomAuth=bearer ", tstr, ";path=/Prod;Max-Age=900;HttpOnly;SameSite=None;Secure"),
 			"Access-Control-Allow-Origin":      "http://localhost:5173",
 			"Access-Control-Allow-Credentials": "true",
-			"Access-Control-Allow-Methods":     "GET, POST",
-			"Access-Control-Allow-Headers":     "Content-Type, *",
 		},
 	}, nil
 }

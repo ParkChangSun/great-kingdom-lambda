@@ -18,6 +18,12 @@ Resources:
       BuildMethod: go1.x
     Properties:
       CodeUri: handlers/authorizer/
+      Events:
+        RestPOST:
+          Type: Api
+          Properties:
+            Path: /cookie
+            Method: GET
 
   WebSocketApi:
     Type: AWS::ApiGatewayV2::Api
