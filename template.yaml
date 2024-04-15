@@ -12,18 +12,88 @@ Globals:
       - x86_64
 
 Resources:
+  GreatKingdomRestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: great-kingdom-restapi
+      StageName: Prod
+      Auth:
+        Authorizers:
+          LambdaAuthorizer:
+            FunctionArn: !GetAtt AuthorizerFunction.Arn
+            FunctionPayloadType: REQUEST
+            Identity:
+              Headers:
+                - Cookie
+
   AuthorizerFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
     Properties:
       CodeUri: handlers/authorizer/
+
+  CreateGameSessionFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/create-session/
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref GameSessionDynamoDB
+      Environment:
+        Variables:
+          GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
       Events:
         RestPOST:
           Type: Api
           Properties:
-            Path: /cookie
-            Method: GET
+            RestApiId: !Ref GreatKingdomRestApi
+            Path: /game
+            Method: POST
+            Auth:
+              Authorizer: LambdaAuthorizer
+
+  SignUpFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/sign-up/
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref UserDynamoDB
+      Environment:
+        Variables:
+          USER_DYNAMODB: !Ref UserDynamoDB
+      Events:
+        RestPOST:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GreatKingdomRestApi
+            Path: /signup
+            Method: POST
+
+  SignInFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/sign-in/
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref UserDynamoDB
+      Environment:
+        Variables:
+          USER_DYNAMODB: !Ref UserDynamoDB
+      Events:
+        RestPOST:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GreatKingdomRestApi
+            Path: /signin
+            Method: POST
 
   WebSocketApi:
     Type: AWS::ApiGatewayV2::Api
@@ -223,63 +293,6 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt WebSocketEventQueue.Arn
-
-  CreateGameSessionFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/create-session/
-      Policies:
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref GameSessionDynamoDB
-      Environment:
-        Variables:
-          GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
-      Events:
-        RestPOST:
-          Type: Api
-          Properties:
-            Path: /game
-            Method: POST
-
-  SignUpFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/sign-up/
-      Policies:
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref UserDynamoDB
-      Environment:
-        Variables:
-          USER_DYNAMODB: !Ref UserDynamoDB
-      Events:
-        RestPOST:
-          Type: Api
-          Properties:
-            Path: /signup
-            Method: POST
-
-  SignInFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/sign-in/
-      Policies:
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref UserDynamoDB
-      Environment:
-        Variables:
-          USER_DYNAMODB: !Ref UserDynamoDB
-      Events:
-        RestPOST:
-          Type: Api
-          Properties:
-            Path: /signin
-            Method: POST
 
   WebSocketConnectionDynamoDB:
     Type: AWS::DynamoDB::Table

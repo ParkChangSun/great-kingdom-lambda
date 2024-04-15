@@ -137,6 +137,10 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				if err != nil {
 					return err
 				}
+				gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
+					EventType: game.GAMEEVENT,
+					Game:      gameSession.Game,
+				})
 				return nil
 			}
 
@@ -189,6 +193,7 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			if err != nil {
 				return err
 			}
+			return nil
 
 		case game.CHATEVENT:
 			msg := game.GameChatSQSRecord{}

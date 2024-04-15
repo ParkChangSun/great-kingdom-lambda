@@ -11,27 +11,45 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func handler(ctx context.Context, req events.APIGatewayProxyRequest) events.APIGatewayCustomAuthorizerResponse {
+func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTypeRequest) (events.APIGatewayCustomAuthorizerResponse, error) {
 	cookie := req.Headers["Cookie"]
-
-	if strings.Contains(cookie, "GreatKingdomAuth") {
-		payload, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomAuth=")+17:], ";")
-		if strings.Compare(payload[:6], "bearer") == 0 {
-			_, token, _ := strings.Cut(payload, " ")
-			claim := game.AuthTokenClaims{}
-			t, err := jwt.ParseWithClaims(token, &claim, func(t *jwt.Token) (interface{}, error) {
-				return []byte("key"), nil
-			})
-			if err != nil {
-				return events.APIGatewayCustomAuthorizerResponse{}
-			}
-			fmt.Printf("%+v %v", claim, t.Valid)
-
-		} else {
-			fmt.Print("bearer error")
-		}
+	if !strings.Contains(cookie, "GreatKingdomAuth") {
+		return events.APIGatewayCustomAuthorizerResponse{}, fmt.Errorf("no auth headers")
 	}
-	return events.APIGatewayCustomAuthorizerResponse{}
+	payload, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomAuth=")+17:], ";")
+	tokenType, token, _ := strings.Cut(payload, " ")
+	if strings.Compare(tokenType, "bearer") != 0 {
+		return events.APIGatewayCustomAuthorizerResponse{}, fmt.Errorf("token type not matching")
+	}
+	claim := game.AuthTokenClaims{}
+	t, err := jwt.ParseWithClaims(token, &claim, func(t *jwt.Token) (interface{}, error) {
+		return []byte("key"), nil
+	})
+	if err != nil {
+		return events.APIGatewayCustomAuthorizerResponse{}, err
+	}
+	if t.Valid {
+		return events.APIGatewayCustomAuthorizerResponse{
+			PrincipalID: claim.UserId,
+			PolicyDocument: events.APIGatewayCustomAuthorizerPolicy{
+				Version: "2012-10-17",
+				Statement: []events.IAMPolicyStatement{
+					{Action: []string{"execute-api:Invoke"}, Effect: "Allow", Resource: []string{req.MethodArn}},
+				},
+			},
+			Context: map[string]interface{}{"UserId": claim.UserId},
+		}, nil
+	} else {
+		return events.APIGatewayCustomAuthorizerResponse{
+			PrincipalID: claim.UserId,
+			PolicyDocument: events.APIGatewayCustomAuthorizerPolicy{
+				Version: "2012-10-17",
+				Statement: []events.IAMPolicyStatement{
+					{Action: []string{"execute-api:Invoke"}, Effect: "Deny", Resource: []string{req.MethodArn}},
+				},
+			},
+		}, nil
+	}
 }
 
 func main() {
