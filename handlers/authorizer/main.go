@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"sam-app/game"
 	"strings"
 
@@ -34,7 +35,11 @@ func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTy
 			PolicyDocument: events.APIGatewayCustomAuthorizerPolicy{
 				Version: "2012-10-17",
 				Statement: []events.IAMPolicyStatement{
-					{Action: []string{"execute-api:Invoke"}, Effect: "Allow", Resource: []string{req.MethodArn}},
+					{
+						Action:   []string{"execute-api:Invoke"},
+						Effect:   "Allow",
+						Resource: []string{fmt.Sprintf("%s:%s/*", os.Getenv("ALLOWED_RESOURCES_PREFIX"), req.RequestContext.APIID)},
+					},
 				},
 			},
 			Context: map[string]interface{}{"UserId": claim.UserId},

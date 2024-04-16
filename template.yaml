@@ -32,6 +32,10 @@ Resources:
       BuildMethod: go1.x
     Properties:
       CodeUri: handlers/authorizer/
+      Environment:
+        Variables:
+          ALLOWED_RESOURCES_PREFIX: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}
+        
 
   CreateGameSessionFunction:
     Type: AWS::Serverless::Function
@@ -52,6 +56,28 @@ Resources:
             RestApiId: !Ref GreatKingdomRestApi
             Path: /game
             Method: POST
+            Auth:
+              Authorizer: LambdaAuthorizer
+
+  GetGameSessionsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/get-sessions/
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref GameSessionDynamoDB
+      Environment:
+        Variables:
+          GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
+      Events:
+        RestGET:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GreatKingdomRestApi
+            Path: /games
+            Method: GET
             Auth:
               Authorizer: LambdaAuthorizer
 

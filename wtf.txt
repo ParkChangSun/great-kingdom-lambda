@@ -12,6 +12,7 @@
 해야되는거
 secure samesite cookie
 cors
+토큰 로테이션
 
 넘긴거
 config에러 처리 무시
