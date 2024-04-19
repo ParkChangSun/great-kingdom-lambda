@@ -7,7 +7,16 @@
 
 일단 서브도메인을 같이할수는 있다 그러면 아마 쿠키가 가긴 할거야
 
+cors세팅
+쿠키 파티션
 
+websocket authorizer
+
+게임시작할때 2명인지 체크하고
+한명 나가면 게임끝나고 승패데이터
+
+커넥트 라우트에 authorizr붙여넣음
+안되면 그냥 소켓 연결시에 해야지뭐
 
 해야되는거
 secure samesite cookie
@@ -19,11 +28,15 @@ config에러 처리 무시
 게임시작 일단 수 두는 메시지(move)에 담아놓음
 
 나아중에해볼거
+dead letter queue
 dynamodb transactions
 수많은 에러 핸들링 - 핸들러에서 에러 발생하면 메시지로 알려줘야함
 잘못된 리퀘스트 오면 새로고침 시키기?
 게임 데이터 저장
 게임 데이터와 채팅 데이터는 굳이 동기 적으로 할필요 없다(진짜쓸모없네)
+
+노트
+스벨트 스토어는 새로고침하면 사라짐
 
 
 # MyWebSocketPermission:
@@ -279,3 +292,20 @@ func gameEvent(ctx context.Context, msg game.GameMoveSQSRecord) error {
         DataTraceEnabled: false
         ThrottlingBurstLimit: 10
         ThrottlingRateLimit: 10
+
+
+	let modalOn: Boolean = false;
+	let modalLobbyId: string = '';
+	let pass = '';
+	const onSubmit = async () => {
+		const res = await fetch(`http://localhost:8000/game/pass/${modalLobbyId}`, {
+			method: 'POST',
+			body: JSON.stringify({ password: pass }),
+			credentials: 'include'
+		});
+		if (res.ok) {
+			goto(`/game/${modalLobbyId}`);
+		} else {
+			alert('password incorrect');
+		}
+	};

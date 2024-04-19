@@ -14,20 +14,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
 func handler(ctx context.Context, req events.SQSEvent) error {
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return err
-	}
-
+	cfg, _ := config.LoadDefaultConfig(ctx)
 	dbClient := dynamodb.NewFromConfig(cfg)
-	wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
-		o.BaseEndpoint = aws.String(os.Getenv("API_ENDPOINT"))
-	})
+	// wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
+	// 	o.BaseEndpoint = aws.String(os.Getenv("API_ENDPOINT"))
+	// })
 
 	for _, record := range req.Records {
 		switch aws.ToString(record.MessageAttributes["EventType"].StringValue) {
@@ -36,7 +31,7 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			json.Unmarshal([]byte(record.Body), &msg)
 
 			item, _ := attributevalue.MarshalMap(msg)
-			_, err = dbClient.PutItem(ctx, &dynamodb.PutItemInput{TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")), Item: item})
+			_, err := dbClient.PutItem(ctx, &dynamodb.PutItemInput{TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")), Item: item})
 			if err != nil {
 				return err
 			}
@@ -63,23 +58,27 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				Chat:               fmt.Sprint(msg.ConnectionId, " has joined the game."),
 			})
 
-			gameData, _ := json.Marshal(game.ServerToClient{
+			// gameData, _ := json.Marshal(game.ServerToClient{
+			// 	EventType: game.GAMEEVENT,
+			// 	Game:      gameSession.Game,
+			// })
+			// _, err = wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
+			// 	ConnectionId: aws.String(msg.ConnectionId),
+			// 	Data:         gameData,
+			// })
+			// if err != nil {
+			// 	log.Print(err)
+			// }
+			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
 				EventType: game.GAMEEVENT,
 				Game:      gameSession.Game,
 			})
-			_, err = wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
-				ConnectionId: aws.String(msg.ConnectionId),
-				Data:         gameData,
-			})
-			if err != nil {
-				log.Print(err)
-			}
 
 		case game.LEAVEEVENT:
 			msg := game.ConnectionDDBItem{}
 			json.Unmarshal([]byte(record.Body), &msg)
 
-			_, err = dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+			_, err := dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 				TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
 				Key:       game.GetConnectionDynamoDBKey(msg.ConnectionId),
 			})
@@ -203,6 +202,7 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			if err != nil {
 				return err
 			}
+			log.Print(gameSession)
 
 			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
 				EventType: game.CHATEVENT,

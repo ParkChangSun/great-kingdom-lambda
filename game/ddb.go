@@ -35,6 +35,14 @@ type GameSessionDDBItem struct {
 	Game               Game
 }
 
+func GetGameSessionDynamoDBKey(gameSessionId string) map[string]types.AttributeValue {
+	key, err := attributevalue.MarshalMap(struct{ GameSessionId string }{gameSessionId})
+	if err != nil {
+		log.Print(err)
+	}
+	return key
+}
+
 func (s GameSessionDDBItem) SendWebSocketMessage(ctx context.Context, payload any) {
 	data, _ := json.Marshal(payload)
 
@@ -60,9 +68,11 @@ func (s GameSessionDDBItem) UpdateGame(ctx context.Context) error {
 	update := expression.Set(expression.Name("Game"), expression.Value(s.Game))
 	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
 
+	key, _ := attributevalue.MarshalMap(struct{ GameSessionId string }{GameSessionId: s.GameSessionId})
+
 	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-		Key:                       GetGameSessionDynamoDBKey(s.GameSessionId),
+		Key:                       key,
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),
@@ -107,11 +117,6 @@ func (s *GameSessionDDBItem) StartNewGame(blueId string, orangeId string) {
 		Playing:   true,
 		PlayersId: [2]string{blueId, orangeId},
 	}
-}
-
-func GetGameSessionDynamoDBKey(gameSessionId string) map[string]types.AttributeValue {
-	key, _ := attributevalue.MarshalMap(struct{ GameSessionId string }{gameSessionId})
-	return key
 }
 
 func GetGameSession(ctx context.Context, gameSessionId string) (GameSessionDDBItem, error) {
@@ -162,6 +167,7 @@ type UserDDBItem struct {
 	UserUUID     string
 	UserId       string
 	PasswordHash string
+	W, L, D      int
 }
 
 func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {

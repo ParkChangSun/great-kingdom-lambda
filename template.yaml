@@ -36,7 +36,6 @@ Resources:
         Variables:
           ALLOWED_RESOURCES_PREFIX: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}
         
-
   CreateGameSessionFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -128,6 +127,23 @@ Resources:
       ProtocolType: WEBSOCKET
       RouteSelectionExpression: "$request.body.action"
 
+  WebSocketApiAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      Name: LambdaAuthorizer
+      ApiId: !Ref WebSocketApi
+      AuthorizerType: REQUEST
+      AuthorizerUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
+      IdentitySource: 
+        - route.request.header.Cookie
+
+  WebSocketAuthorizerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref AuthorizerFunction
+      Principal: apigateway.amazonaws.com
+
   WebSocketDevStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
@@ -141,6 +157,8 @@ Resources:
       ApiId: !Ref WebSocketApi
       RouteKey: $connect
       Target: !Sub 'integrations/${WebSocketConnectIntegration}'
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref WebSocketApiAuthorizer
 
   WebSocketConnectIntegration:
     Type: AWS::ApiGatewayV2::Integration
@@ -265,7 +283,7 @@ Resources:
     Metadata:
       BuildMethod: go1.x
     Properties:
-      CodeUri: handlers/ws-game-move/
+      CodeUri: handlers/ws-chat/
       Policies:
         - AmazonSQSFullAccess
         - DynamoDBCrudPolicy: 
@@ -289,6 +307,15 @@ Resources:
       QueueName: WebSocketEventQueue.fifo
       FifoQueue: true
       ContentBasedDeduplication: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 1
+
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: DeadLetterQueue.fifo
+      FifoQueue: true
 
   WebSocketEventHandlerFunction:
     Type: AWS::Serverless::Function

@@ -31,8 +31,9 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
+	id := uuid.New().String()
 	item, _ := attributevalue.MarshalMap(game.GameSessionDDBItem{
-		GameSessionId:   uuid.New().String(),
+		GameSessionId:   id,
 		GameSessionName: body.GameSessionName,
 	})
 	_, err = dbClient.PutItem(ctx, &dynamodb.PutItemInput{
@@ -43,12 +44,14 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
+	b, _ := json.Marshal(struct{ GameSessionId string }{GameSessionId: id})
 	return events.APIGatewayProxyResponse{
 		StatusCode: 201,
 		Headers: map[string]string{
 			"Access-Control-Allow-Origin":      "http://localhost:5173",
 			"Access-Control-Allow-Credentials": "true",
 		},
+		Body: string(b),
 	}, nil
 }
 

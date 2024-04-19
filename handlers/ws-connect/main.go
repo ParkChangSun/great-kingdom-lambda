@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"os"
 	"sam-app/game"
 
@@ -17,6 +18,12 @@ import (
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
+	log.Print(req.RequestContext.Authorizer)
+
+	if _, ok := req.QueryStringParameters["GameSessionId"]; !ok {
 		return events.APIGatewayProxyResponse{}, err
 	}
 

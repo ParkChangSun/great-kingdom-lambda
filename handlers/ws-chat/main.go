@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"os"
 	"sam-app/game"
 
@@ -19,6 +20,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
+	log.Print("chat log fdsafdsa")
 
 	chat := struct {
 		Chat string
@@ -40,6 +42,8 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		GameSessionId: item.GameSessionId,
 		Chat:          chat.Chat,
 	})
+	log.Printf("chat %+v item %+v", chat, item)
+	log.Printf("chat %+v item %+v", chat, item)
 
 	sqsClient := sqs.NewFromConfig(cfg)
 	_, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
