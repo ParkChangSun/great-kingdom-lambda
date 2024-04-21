@@ -55,7 +55,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 			"Set-Cookie": fmt.Sprint(
 				"GreatKingdomAuth=bearer ",
 				tstr,
-				";domain=execute-api.us-east-1.amazonaws.com;path=/;Max-Age=900;HttpOnly;SameSite=None;Secure",
+				";domain=execute-api.us-east-1.amazonaws.com;path=/;Max-Age=900;HttpOnly;SameSite=None;Secure;Partitioned",
 			),
 			"Access-Control-Allow-Origin":      "http://localhost:5173",
 			"Access-Control-Allow-Credentials": "true",

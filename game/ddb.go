@@ -36,30 +36,8 @@ type GameSessionDDBItem struct {
 }
 
 func GetGameSessionDynamoDBKey(gameSessionId string) map[string]types.AttributeValue {
-	key, err := attributevalue.MarshalMap(struct{ GameSessionId string }{gameSessionId})
-	if err != nil {
-		log.Print(err)
-	}
+	key, _ := attributevalue.MarshalMap(struct{ GameSessionId string }{gameSessionId})
 	return key
-}
-
-func (s GameSessionDDBItem) SendWebSocketMessage(ctx context.Context, payload any) {
-	data, _ := json.Marshal(payload)
-
-	cfg, _ := config.LoadDefaultConfig(ctx)
-	wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
-		o.BaseEndpoint = aws.String(os.Getenv("API_ENDPOINT"))
-	})
-
-	for _, c := range s.CurrentConnections {
-		_, err := wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
-			ConnectionId: aws.String(c.ConnectionId),
-			Data:         data,
-		})
-		if err != nil {
-			log.Print(err)
-		}
-	}
 }
 
 func (s GameSessionDDBItem) UpdateGame(ctx context.Context) error {
@@ -68,11 +46,9 @@ func (s GameSessionDDBItem) UpdateGame(ctx context.Context) error {
 	update := expression.Set(expression.Name("Game"), expression.Value(s.Game))
 	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
 
-	key, _ := attributevalue.MarshalMap(struct{ GameSessionId string }{GameSessionId: s.GameSessionId})
-
 	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-		Key:                       key,
+		Key:                       GetGameSessionDynamoDBKey(s.GameSessionId),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),
@@ -117,6 +93,7 @@ func (s *GameSessionDDBItem) StartNewGame(blueId string, orangeId string) {
 		Playing:   true,
 		PlayersId: [2]string{blueId, orangeId},
 	}
+	s.Game.Board[4][4] = Neutral
 }
 
 func GetGameSession(ctx context.Context, gameSessionId string) (GameSessionDDBItem, error) {
@@ -133,6 +110,59 @@ func GetGameSession(ctx context.Context, gameSessionId string) (GameSessionDDBIt
 
 	attributevalue.UnmarshalMap(out.Item, &gameSession)
 	return gameSession, nil
+}
+
+func (s GameSessionDDBItem) BroadCastWebSocketMessage(ctx context.Context, payload any) {
+	data, _ := json.Marshal(payload)
+
+	cfg, _ := config.LoadDefaultConfig(ctx)
+	wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
+		o.BaseEndpoint = aws.String(os.Getenv("API_ENDPOINT"))
+	})
+
+	for _, c := range s.CurrentConnections {
+		_, err := wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
+			ConnectionId: aws.String(c.ConnectionId),
+			Data:         data,
+		})
+		if err != nil {
+			log.Print(err)
+		}
+	}
+}
+
+func (s GameSessionDDBItem) BroadCastChat(ctx context.Context, userId string, chat string) {
+	s.BroadCastWebSocketMessage(ctx, struct {
+		EventType string
+		UserId    string
+		Chat      string
+	}{
+		EventType: CHATEVENT,
+		UserId:    userId,
+		Chat:      chat,
+	})
+}
+
+func (s GameSessionDDBItem) BroadCastGame(ctx context.Context) {
+	s.BroadCastWebSocketMessage(ctx, struct {
+		EventType string
+		Game      Game
+	}{
+		EventType: GAMEEVENT,
+		Game:      s.Game,
+	})
+}
+
+func (s GameSessionDDBItem) BroadCastUser(ctx context.Context) {
+	s.BroadCastWebSocketMessage(ctx, struct {
+		EventType          string
+		Players            []User
+		CurrentConnections []User
+	}{
+		EventType:          GAMEEVENT,
+		Players:            s.Players,
+		CurrentConnections: s.CurrentConnections,
+	})
 }
 
 type ConnectionDDBItem struct {
@@ -185,6 +215,35 @@ func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
 
 	attributevalue.UnmarshalMap(query.Item, &item)
 	return item, nil
+}
+
+func (u *UserDDBItem) UpdateRecord(ctx context.Context) error {
+	cfg, _ := config.LoadDefaultConfig(ctx)
+
+	update := expression.Set(
+		expression.Name("W"),
+		expression.Value(u.W),
+	).Set(
+		expression.Name("L"),
+		expression.Value(u.L),
+	).Set(
+		expression.Name("D"),
+		expression.Value(u.D),
+	)
+	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
+
+	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(os.Getenv("USER_DYNAMODB")),
+		Key:                       GetGameSessionDynamoDBKey(u.UserId),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type GameMoveSQSRecord struct {

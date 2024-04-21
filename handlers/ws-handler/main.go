@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"sam-app/game"
 	"slices"
@@ -20,9 +19,6 @@ import (
 func handler(ctx context.Context, req events.SQSEvent) error {
 	cfg, _ := config.LoadDefaultConfig(ctx)
 	dbClient := dynamodb.NewFromConfig(cfg)
-	// wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
-	// 	o.BaseEndpoint = aws.String(os.Getenv("API_ENDPOINT"))
-	// })
 
 	for _, record := range req.Records {
 		switch aws.ToString(record.MessageAttributes["EventType"].StringValue) {
@@ -51,28 +47,10 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				return err
 			}
 
-			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
-				EventType:          game.JOINEVENT,
-				Players:            gameSession.Players,
-				CurrentConnections: gameSession.CurrentConnections,
-				Chat:               fmt.Sprint(msg.ConnectionId, " has joined the game."),
-			})
+			gameSession.BroadCastUser(ctx)
+			gameSession.BroadCastChat(ctx, "", fmt.Sprint(msg.UserId, " has joined the game."))
 
-			// gameData, _ := json.Marshal(game.ServerToClient{
-			// 	EventType: game.GAMEEVENT,
-			// 	Game:      gameSession.Game,
-			// })
-			// _, err = wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
-			// 	ConnectionId: aws.String(msg.ConnectionId),
-			// 	Data:         gameData,
-			// })
-			// if err != nil {
-			// 	log.Print(err)
-			// }
-			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
-				EventType: game.GAMEEVENT,
-				Game:      gameSession.Game,
-			})
+			gameSession.BroadCastGame(ctx)
 
 		case game.LEAVEEVENT:
 			msg := game.ConnectionDDBItem{}
@@ -89,6 +67,33 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			gameSession, err := game.GetGameSession(ctx, msg.GameSessionId)
 			if err != nil {
 				return err
+			}
+
+			if gameSession.Game.Playing && slices.ContainsFunc(gameSession.Players, func(u game.User) bool { return u.ConnectionId == msg.ConnectionId }) {
+				w := slices.IndexFunc(gameSession.Players, func(u game.User) bool { return u.ConnectionId != msg.ConnectionId })
+				winner, _ := game.GetUser(ctx, gameSession.Players[w].UserId)
+				winner.W++
+				err = winner.UpdateRecord(ctx)
+				if err != nil {
+					return err
+				}
+
+				l := slices.IndexFunc(gameSession.Players, func(u game.User) bool { return u.ConnectionId == msg.ConnectionId })
+				loser, _ := game.GetUser(ctx, gameSession.Players[l].UserId)
+				loser.W++
+				err = winner.UpdateRecord(ctx)
+				if err != nil {
+					return err
+				}
+
+				gameSession.Game.Playing = false
+				err = gameSession.UpdateGame(ctx)
+				if err != nil {
+					return err
+				}
+
+				gameSession.BroadCastChat(ctx, "", fmt.Sprint(gameSession.Players[l].UserId, "lost."))
+				gameSession.BroadCastGame(ctx)
 			}
 
 			gameSession.CurrentConnections = slices.DeleteFunc(gameSession.CurrentConnections, func(u game.User) bool {
@@ -112,12 +117,8 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 					return err
 				}
 
-				gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
-					EventType:          game.LEAVEEVENT,
-					Players:            gameSession.Players,
-					CurrentConnections: gameSession.CurrentConnections,
-					Chat:               fmt.Sprintf(msg.ConnectionId, " has left the game."),
-				})
+				gameSession.BroadCastUser(ctx)
+				gameSession.BroadCastChat(ctx, "", fmt.Sprintf(msg.ConnectionId, " has left the game."))
 			}
 
 		case game.GAMEEVENT:
@@ -130,20 +131,21 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				return err
 			}
 
-			if msg.Move.Start && msg.ConnectionId == gameSession.Players[0].ConnectionId && !gameSession.Game.Playing {
-				gameSession.StartNewGame(gameSession.Players[0].UserId, gameSession.Players[1].UserId)
-				err = gameSession.UpdateGame(ctx)
-				if err != nil {
-					return err
+			if msg.Move.Start {
+				if msg.ConnectionId == gameSession.Players[0].ConnectionId && !gameSession.Game.Playing && len(gameSession.Players) == 2 {
+					gameSession.StartNewGame(gameSession.Players[0].UserId, gameSession.Players[1].UserId)
+					err = gameSession.UpdateGame(ctx)
+					if err != nil {
+						return err
+					}
+					gameSession.BroadCastGame(ctx)
+					return nil
+				} else {
+					return nil
 				}
-				gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
-					EventType: game.GAMEEVENT,
-					Game:      gameSession.Game,
-				})
-				return nil
 			}
 
-			if !gameSession.Game.Playing || gameSession.Game.PlayersId[gameSession.Game.Turn] != msg.UserId {
+			if !gameSession.Game.Playing || gameSession.Game.PlayersId[(gameSession.Game.Turn-1)%2] != msg.UserId {
 				return nil
 			}
 
@@ -157,16 +159,10 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 					} else {
 						c = "Game over. Draw."
 					}
-					gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
-						EventType: game.GAMEEVENT,
-						Game:      gameSession.Game,
-						Chat:      c,
-					})
+					gameSession.BroadCastGame(ctx)
+					gameSession.BroadCastChat(ctx, "", c)
 				} else {
-					gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
-						EventType: game.GAMEEVENT,
-						Game:      gameSession.Game,
-					})
+					gameSession.BroadCastGame(ctx)
 				}
 			} else {
 				finished, err := gameSession.Game.Move(msg.Move.Point)
@@ -175,16 +171,10 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				}
 
 				if finished {
-					gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
-						EventType: game.GAMEEVENT,
-						Game:      gameSession.Game,
-						Chat:      fmt.Sprint("Game over. ", gameSession.Game.PlayersId[gameSession.Game.Turn%2], " won."),
-					})
+					gameSession.BroadCastGame(ctx)
+					gameSession.BroadCastChat(ctx, "", fmt.Sprint("Game over. ", gameSession.Game.PlayersId[gameSession.Game.Turn%2], " won."))
 				} else {
-					gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
-						EventType: game.GAMEEVENT,
-						Game:      gameSession.Game,
-					})
+					gameSession.BroadCastGame(ctx)
 				}
 			}
 
@@ -202,12 +192,8 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			if err != nil {
 				return err
 			}
-			log.Print(gameSession)
 
-			gameSession.SendWebSocketMessage(ctx, game.ServerToClient{
-				EventType: game.CHATEVENT,
-				Chat:      msg.Chat,
-			})
+			gameSession.BroadCastChat(ctx, msg.UserId, msg.Chat)
 		}
 	}
 

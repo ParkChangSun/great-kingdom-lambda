@@ -33,7 +33,7 @@ type Point struct {
 }
 
 type Move struct {
-	Point
+	Point Point
 	Pass  bool
 	Start bool
 }
@@ -50,13 +50,13 @@ func (g Game) getCellStatus(p Point) (cell CellStatus, edge int) {
 	if p.R < 0 {
 		return Edge, 0
 	}
-	if p.R > 9 {
+	if p.R > 8 {
 		return Edge, 1
 	}
 	if p.C < 0 {
 		return Edge, 2
 	}
-	if p.C > 9 {
+	if p.C > 8 {
 		return Edge, 3
 	}
 	return g.Board[p.R][p.C], -1

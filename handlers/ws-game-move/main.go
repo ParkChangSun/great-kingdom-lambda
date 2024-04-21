@@ -39,8 +39,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		Move:          move,
 	})
 
-	sqsClient := sqs.NewFromConfig(cfg)
-	_, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
+	_, err = sqs.NewFromConfig(cfg).SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:       aws.String(os.Getenv("POST_MESSAGE_QUEUE")),
 		MessageBody:    aws.String(string(msgbody)),
 		MessageGroupId: aws.String(item.GameSessionId),

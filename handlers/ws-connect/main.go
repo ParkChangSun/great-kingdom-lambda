@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"os"
 	"sam-app/game"
 
@@ -21,8 +20,6 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	log.Print(req.RequestContext.Authorizer)
-
 	if _, ok := req.QueryStringParameters["GameSessionId"]; !ok {
 		return events.APIGatewayProxyResponse{}, err
 	}
@@ -31,7 +28,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		ConnectionId:  req.RequestContext.ConnectionID,
 		Timestamp:     req.RequestContext.RequestTimeEpoch,
 		GameSessionId: req.QueryStringParameters["GameSessionId"],
-		UserId:        "user auth not implemented",
+		UserId:        req.RequestContext.Authorizer.(map[string]interface{})["UserId"].(string),
 	})
 
 	sqsClient := sqs.NewFromConfig(cfg)
