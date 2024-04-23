@@ -352,6 +352,8 @@ Resources:
             TableName: !Ref WebSocketConnectionDynamoDB
         - DynamoDBCrudPolicy:
             TableName: !Ref GameSessionDynamoDB
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UserDynamoDB
         - Statement:
             - Effect: Allow
               Action:
@@ -363,6 +365,7 @@ Resources:
           API_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketDevStage}"
           CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
           GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
+          USER_DYNAMODB: !Ref UserDynamoDB
           POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
       Events:
         WebSocketEventSQS:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sam-app/game"
 	"slices"
@@ -15,6 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
+
+// guess should not return for for loop
 
 func handler(ctx context.Context, req events.SQSEvent) error {
 	cfg, _ := config.LoadDefaultConfig(ctx)
@@ -41,58 +44,50 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			if len(gameSession.Players) < 2 {
 				gameSession.Players = append(gameSession.Players, game.User{ConnectionId: msg.ConnectionId, UserId: msg.UserId})
 			}
-
 			err = gameSession.UpdatePlayers(ctx)
 			if err != nil {
 				return err
 			}
-
 			gameSession.BroadCastUser(ctx)
-			gameSession.BroadCastChat(ctx, "", fmt.Sprint(msg.UserId, " has joined the game."))
+			gameSession.BroadCastChat(ctx, fmt.Sprint(msg.UserId, " has joined the game."))
 
+			// for joined user
 			gameSession.BroadCastGame(ctx)
 
 		case game.LEAVEEVENT:
 			msg := game.ConnectionDDBItem{}
 			json.Unmarshal([]byte(record.Body), &msg)
 
-			_, err := dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-				TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
-				Key:       game.GetConnectionDynamoDBKey(msg.ConnectionId),
-			})
-			if err != nil {
-				return err
-			}
+			// _, err := dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+			// 	TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
+			// 	Key:       game.GetConnectionDynamoDBKey(msg.ConnectionId),
+			// })
+			// if err != nil {
+			// 	return err
+			// }
 
+			log.Printf("%+v", msg)
 			gameSession, err := game.GetGameSession(ctx, msg.GameSessionId)
 			if err != nil {
 				return err
 			}
 
 			if gameSession.Game.Playing && slices.ContainsFunc(gameSession.Players, func(u game.User) bool { return u.ConnectionId == msg.ConnectionId }) {
-				w := slices.IndexFunc(gameSession.Players, func(u game.User) bool { return u.ConnectionId != msg.ConnectionId })
-				winner, _ := game.GetUser(ctx, gameSession.Players[w].UserId)
-				winner.W++
-				err = winner.UpdateRecord(ctx)
+				if gameSession.Game.PlayersId[0] == msg.UserId {
+					err = gameSession.UpdateGameResult(ctx, 1)
+				} else {
+					err = gameSession.UpdateGameResult(ctx, 0)
+				}
 				if err != nil {
 					return err
 				}
-
-				l := slices.IndexFunc(gameSession.Players, func(u game.User) bool { return u.ConnectionId == msg.ConnectionId })
-				loser, _ := game.GetUser(ctx, gameSession.Players[l].UserId)
-				loser.W++
-				err = winner.UpdateRecord(ctx)
-				if err != nil {
-					return err
-				}
+				gameSession.BroadCastChat(ctx, fmt.Sprint(msg.UserId, " lost."))
 
 				gameSession.Game.Playing = false
 				err = gameSession.UpdateGame(ctx)
 				if err != nil {
 					return err
 				}
-
-				gameSession.BroadCastChat(ctx, "", fmt.Sprint(gameSession.Players[l].UserId, "lost."))
 				gameSession.BroadCastGame(ctx)
 			}
 
@@ -116,9 +111,8 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				if err != nil {
 					return err
 				}
-
 				gameSession.BroadCastUser(ctx)
-				gameSession.BroadCastChat(ctx, "", fmt.Sprintf(msg.ConnectionId, " has left the game."))
+				gameSession.BroadCastChat(ctx, fmt.Sprint(msg.UserId, " has left the game."))
 			}
 
 		case game.GAMEEVENT:
@@ -131,18 +125,15 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				return err
 			}
 
-			if msg.Move.Start {
-				if msg.ConnectionId == gameSession.Players[0].ConnectionId && !gameSession.Game.Playing && len(gameSession.Players) == 2 {
-					gameSession.StartNewGame(gameSession.Players[0].UserId, gameSession.Players[1].UserId)
-					err = gameSession.UpdateGame(ctx)
-					if err != nil {
-						return err
-					}
-					gameSession.BroadCastGame(ctx)
-					return nil
-				} else {
-					return nil
+			if msg.Move.Start && msg.ConnectionId == gameSession.Players[0].ConnectionId && !gameSession.Game.Playing && len(gameSession.Players) == 2 {
+				gameSession.StartNewGame(gameSession.Players[0].UserId, gameSession.Players[1].UserId)
+				err = gameSession.UpdateGame(ctx)
+				if err != nil {
+					return err
 				}
+				gameSession.BroadCastGame(ctx)
+
+				return nil
 			}
 
 			if !gameSession.Game.Playing || gameSession.Game.PlayersId[(gameSession.Game.Turn-1)%2] != msg.UserId {
@@ -151,38 +142,54 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 
 			if msg.Move.Pass {
 				if gameSession.Game.Pass() {
-					var c string
 					if b, o := gameSession.Game.CountTerritory(); b > o {
-						c = fmt.Sprint("Game over. ", gameSession.Game.PlayersId[0], " won.")
+						gameSession.UpdateGameResult(ctx, 0)
+						gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[0], " won."))
 					} else if b < o {
-						c = fmt.Sprint("Game over. ", gameSession.Game.PlayersId[1], " won.")
+						gameSession.UpdateGameResult(ctx, 1)
+						gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[1], " won."))
 					} else {
-						c = "Game over. Draw."
+						gameSession.UpdateGameResult(ctx, -1)
+						gameSession.BroadCastChat(ctx, "Game over. Draw.")
 					}
-					gameSession.BroadCastGame(ctx)
-					gameSession.BroadCastChat(ctx, "", c)
-				} else {
-					gameSession.BroadCastGame(ctx)
 				}
 			} else {
-				finished, err := gameSession.Game.Move(msg.Move.Point)
+				sieged, err := gameSession.Game.Move(msg.Move.Point)
 				if err != nil {
 					return err
 				}
-
-				if finished {
-					gameSession.BroadCastGame(ctx)
-					gameSession.BroadCastChat(ctx, "", fmt.Sprint("Game over. ", gameSession.Game.PlayersId[gameSession.Game.Turn%2], " won."))
+				if sieged {
+					gameSession.UpdateGameResult(ctx, (gameSession.Game.Turn-1)%2)
+					gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[gameSession.Game.Turn%2], " won."))
 				} else {
-					gameSession.BroadCastGame(ctx)
+					movable := false
+					for _, r := range gameSession.Game.Board {
+						for _, c := range r {
+							if c == game.EmptyCell {
+								movable = true
+							}
+						}
+					}
+					if !movable {
+						gameSession.Game.Playing = false
+						if b, o := gameSession.Game.CountTerritory(); b > o {
+							gameSession.UpdateGameResult(ctx, 0)
+							gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[0], " won."))
+						} else if b < o {
+							gameSession.UpdateGameResult(ctx, 1)
+							gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[1], " won."))
+						} else {
+							gameSession.UpdateGameResult(ctx, -1)
+							gameSession.BroadCastChat(ctx, "Game over. Draw.")
+						}
+					}
 				}
 			}
-
 			err = gameSession.UpdateGame(ctx)
 			if err != nil {
 				return err
 			}
-			return nil
+			gameSession.BroadCastGame(ctx)
 
 		case game.CHATEVENT:
 			msg := game.GameChatSQSRecord{}
@@ -193,7 +200,10 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 				return err
 			}
 
-			gameSession.BroadCastChat(ctx, msg.UserId, msg.Chat)
+			gameSession.BroadCastChat(ctx, fmt.Sprint(msg.UserId, " : ", msg.Chat))
+
+		default:
+			return nil
 		}
 	}
 

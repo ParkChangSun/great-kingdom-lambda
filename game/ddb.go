@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -20,6 +21,7 @@ const (
 	LEAVEEVENT = "LEAVE"
 	CHATEVENT  = "CHAT"
 	GAMEEVENT  = "GAME"
+	USEREVENT  = "USER"
 )
 
 type User struct {
@@ -88,10 +90,14 @@ func (s GameSessionDDBItem) UpdatePlayers(ctx context.Context) error {
 
 func (s *GameSessionDDBItem) StartNewGame(blueId string, orangeId string) {
 	s.Game = Game{
-		Turn:      1,
-		PassFlag:  false,
-		Playing:   true,
-		PlayersId: [2]string{blueId, orangeId},
+		Turn:     1,
+		PassFlag: false,
+		Playing:  true,
+	}
+	if time.Now().UnixMilli()%2 == 0 {
+		s.Game.PlayersId = [2]string{blueId, orangeId}
+	} else {
+		s.Game.PlayersId = [2]string{orangeId, blueId}
 	}
 	s.Game.Board[4][4] = Neutral
 }
@@ -131,14 +137,12 @@ func (s GameSessionDDBItem) BroadCastWebSocketMessage(ctx context.Context, paylo
 	}
 }
 
-func (s GameSessionDDBItem) BroadCastChat(ctx context.Context, userId string, chat string) {
+func (s GameSessionDDBItem) BroadCastChat(ctx context.Context, chat string) {
 	s.BroadCastWebSocketMessage(ctx, struct {
 		EventType string
-		UserId    string
 		Chat      string
 	}{
 		EventType: CHATEVENT,
-		UserId:    userId,
 		Chat:      chat,
 	})
 }
@@ -159,10 +163,43 @@ func (s GameSessionDDBItem) BroadCastUser(ctx context.Context) {
 		Players            []User
 		CurrentConnections []User
 	}{
-		EventType:          GAMEEVENT,
+		EventType:          USEREVENT,
 		Players:            s.Players,
 		CurrentConnections: s.CurrentConnections,
 	})
+}
+
+func (s GameSessionDDBItem) UpdateGameResult(ctx context.Context, winner int) error {
+	blue, err := GetUser(ctx, s.Game.PlayersId[0])
+	if err != nil {
+		return err
+	}
+	orange, err := GetUser(ctx, s.Game.PlayersId[1])
+	if err != nil {
+		return err
+	}
+
+	if winner == -1 {
+		blue.D++
+		orange.D++
+	} else if winner == 0 {
+		blue.W++
+		orange.L++
+	} else if winner == 1 {
+		blue.L++
+		orange.W++
+	}
+
+	err = blue.UpdateRecord(ctx)
+	if err != nil {
+		return err
+	}
+	err = orange.UpdateRecord(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type ConnectionDDBItem struct {
@@ -217,7 +254,7 @@ func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
 	return item, nil
 }
 
-func (u *UserDDBItem) UpdateRecord(ctx context.Context) error {
+func (u UserDDBItem) UpdateRecord(ctx context.Context) error {
 	cfg, _ := config.LoadDefaultConfig(ctx)
 
 	update := expression.Set(
@@ -232,9 +269,11 @@ func (u *UserDDBItem) UpdateRecord(ctx context.Context) error {
 	)
 	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
 
+	k, _ := attributevalue.MarshalMap(struct{ UserId string }{UserId: u.UserId})
+
 	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(os.Getenv("USER_DYNAMODB")),
-		Key:                       GetGameSessionDynamoDBKey(u.UserId),
+		Key:                       k,
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),

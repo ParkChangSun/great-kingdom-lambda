@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"log"
 )
 
 type CellStatus int
@@ -135,11 +136,13 @@ func (g Game) checkOccupied(p Point) map[Point]struct{} {
 				checkQueue = append(checkQueue, n)
 			}
 			if stat == defenser {
+				log.Print("point ", p, " return nil faced enemy when checklist ", checkedList)
 				return nil
 			}
 			if stat == Edge {
 				edgeCheck[edge] = true
 				if edgeCheck[0] && edgeCheck[1] && edgeCheck[2] && edgeCheck[3] {
+					log.Print("point ", p, " return nil edge check when checklist ", checkedList)
 					return nil
 				}
 			}
@@ -154,6 +157,7 @@ func (g *Game) Move(p Point) (finished bool, err error) {
 		return false, fmt.Errorf(fmt.Sprintf("%+v is not playable point", p))
 	}
 
+	g.PassFlag = false
 	attacker, _ := g.getPlayerColor()
 	g.putPiece(p, attacker)
 
@@ -170,8 +174,6 @@ func (g *Game) Move(p Point) (finished bool, err error) {
 		return
 	}
 
-	g.Turn++
-
 	for _, n := range p.getNeighbors() {
 		if o := g.checkOccupied(n); o != nil {
 			for c := range o {
@@ -179,6 +181,8 @@ func (g *Game) Move(p Point) (finished bool, err error) {
 			}
 		}
 	}
+
+	g.Turn++
 
 	return
 }
