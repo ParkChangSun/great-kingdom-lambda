@@ -102,7 +102,6 @@ Resources:
             Auth:
               Authorizer: LambdaAuthorizer
 
-
   SignUpFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -141,6 +140,26 @@ Resources:
           Properties:
             RestApiId: !Ref GreatKingdomRestApi
             Path: /signin
+            Method: POST
+
+  SignOutFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/sign-out/
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref UserDynamoDB
+      Environment:
+        Variables:
+          USER_DYNAMODB: !Ref UserDynamoDB
+      Events:
+        RestPOST:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GreatKingdomRestApi
+            Path: /signout
             Method: POST
 
   WebSocketApi:

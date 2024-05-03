@@ -44,17 +44,8 @@ func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTy
 			},
 			Context: map[string]interface{}{"UserId": claim.UserId},
 		}, nil
-	} else {
-		return events.APIGatewayCustomAuthorizerResponse{
-			PrincipalID: claim.UserId,
-			PolicyDocument: events.APIGatewayCustomAuthorizerPolicy{
-				Version: "2012-10-17",
-				Statement: []events.IAMPolicyStatement{
-					{Action: []string{"execute-api:Invoke"}, Effect: "Deny", Resource: []string{req.MethodArn}},
-				},
-			},
-		}, nil
 	}
+	return events.APIGatewayCustomAuthorizerResponse{}, nil
 }
 
 func main() {

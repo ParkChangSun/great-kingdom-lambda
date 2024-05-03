@@ -235,6 +235,7 @@ type UserDDBItem struct {
 	UserId       string
 	PasswordHash string
 	W, L, D      int
+	RefreshToken string
 }
 
 func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
@@ -271,7 +272,7 @@ func (u UserDDBItem) UpdateRecord(ctx context.Context) error {
 
 	k, _ := attributevalue.MarshalMap(struct{ UserId string }{UserId: u.UserId})
 
-	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
+	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(os.Getenv("USER_DYNAMODB")),
 		Key:                       k,
 		ExpressionAttributeNames:  expr.Names(),
@@ -281,7 +282,30 @@ func (u UserDDBItem) UpdateRecord(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
 
+func (u UserDDBItem) UpdateRefreshToken(ctx context.Context) error {
+	cfg, _ := config.LoadDefaultConfig(ctx)
+
+	update := expression.Set(
+		expression.Name("RefreshToken"),
+		expression.Value(u.RefreshToken),
+	)
+	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
+
+	k, _ := attributevalue.MarshalMap(struct{ UserId string }{UserId: u.UserId})
+
+	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(os.Getenv("USER_DYNAMODB")),
+		Key:                       k,
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
