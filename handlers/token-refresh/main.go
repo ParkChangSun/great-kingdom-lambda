@@ -2,33 +2,50 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"sam-app/game"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	reqBody := struct {
-		Id       string
-		Password string
+		UserId       string
+		RefreshToken string
 	}{}
-	json.Unmarshal([]byte(req.Body), &reqBody)
-
-	userItem, err := game.GetUser(ctx, reqBody.Id)
+	err := json.Unmarshal([]byte(req.Body), &reqBody)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
-	if userItem.UserId == "" {
-		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "id not found", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
+	userItem, err := game.GetUser(ctx, req.Body)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(userItem.PasswordHash), []byte(reqBody.Password))
+	refreshTokenStr, err := base64.RawStdEncoding.DecodeString(reqBody.RefreshToken)
 	if err != nil {
-		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "incorrect password", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
+		return events.APIGatewayProxyResponse{}, err
+	}
+	refreshToken := game.RefreshToken{}
+	err = json.Unmarshal(refreshTokenStr, &refreshToken)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
+	if userItem.RefreshToken != reqBody.RefreshToken || refreshToken.Time.After(time.Now()) {
+		userItem.RefreshToken = "logout"
+		userItem.UpdateRefreshToken(ctx)
+		return events.APIGatewayProxyResponse{
+			StatusCode: 401,
+			Headers: map[string]string{
+				"Access-Control-Allow-Origin":      "http://localhost:5173",
+				"Access-Control-Allow-Credentials": "true",
+			},
+		}, nil
 	}
 
 	signedToken, err := game.NewAuthToken(userItem.UserId)
@@ -42,7 +59,6 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	resBody, _ := json.Marshal(struct{ Id string }{Id: userItem.UserId})
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers: map[string]string{
@@ -63,7 +79,6 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 				),
 			},
 		},
-		Body: string(resBody),
 	}, nil
 }
 

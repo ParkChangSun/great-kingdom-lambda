@@ -162,6 +162,26 @@ Resources:
             Path: /signout
             Method: POST
 
+  TokenRefreshFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/token-refresh/
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref UserDynamoDB
+      Environment:
+        Variables:
+          USER_DYNAMODB: !Ref UserDynamoDB
+      Events:
+        RestPOST:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GreatKingdomRestApi
+            Path: /tokenrefresh
+            Method: POST
+
   WebSocketApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
