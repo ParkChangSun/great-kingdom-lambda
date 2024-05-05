@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"sam-app/game"
 	"time"
@@ -11,20 +12,27 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	id := req.RequestContext.Authorizer["UserId"].(string)
-	userItem, _ := game.GetUser(ctx, id)
-	userItem.RefreshToken = ""
+	st := struct{ UserId string }{}
+	json.Unmarshal([]byte(req.Body), &st)
+	userItem, _ := game.GetUser(ctx, st.UserId)
+	userItem.RefreshToken = "logout"
 	userItem.UpdateRefreshToken(ctx)
 
 	authCookie := &http.Cookie{
-		Name:    "GreatKingdomAuth",
-		Path:    "/",
-		Expires: time.Now().Add(-1 * time.Hour),
+		Name:     "GreatKingdomAuth",
+		Path:     "/",
+		Expires:  time.Now().Add(-1 * time.Hour),
+		SameSite: http.SameSiteNoneMode,
+		Secure:   true,
+		HttpOnly: true,
 	}
 	refreshCookie := &http.Cookie{
-		Name:    "GreatKingdomAuth",
-		Path:    "/",
-		Expires: time.Now().Add(-1 * time.Hour),
+		Name:     "GreatKingdomAuth",
+		Path:     "/",
+		Expires:  time.Now().Add(-1 * time.Hour),
+		SameSite: http.SameSiteNoneMode,
+		Secure:   true,
+		HttpOnly: true,
 	}
 	return events.APIGatewayProxyResponse{StatusCode: 200,
 		Headers: map[string]string{

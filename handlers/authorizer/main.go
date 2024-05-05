@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"sam-app/game"
 	"strings"
@@ -15,9 +14,8 @@ import (
 
 func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTypeRequest) (events.APIGatewayCustomAuthorizerResponse, error) {
 	cookie := req.Headers["Cookie"]
-	log.Print(cookie)
 	if !strings.Contains(cookie, "GreatKingdomAuth") {
-		return events.APIGatewayCustomAuthorizerResponse{}, fmt.Errorf("no auth headers")
+		return events.APIGatewayCustomAuthorizerResponse{}, nil
 	}
 	payload, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomAuth=")+17:], ";")
 	tokenType, token, _ := strings.Cut(payload, " ")

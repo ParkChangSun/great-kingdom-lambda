@@ -36,7 +36,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	if userItem.RefreshToken != reqBody.RefreshToken || refreshToken.Time.After(time.Now()) {
+	if userItem.RefreshToken != reqBody.RefreshToken || refreshToken.Time.Before(time.Now()) {
 		userItem.RefreshToken = "logout"
 		userItem.UpdateRefreshToken(ctx)
 		return events.APIGatewayProxyResponse{

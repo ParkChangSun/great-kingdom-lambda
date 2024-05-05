@@ -10,6 +10,12 @@ Globals:
     Handler: bootstrap
     Architectures:
       - x86_64
+    Environment:
+      Variables:
+        GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
+        USER_DYNAMODB: !Ref UserDynamoDB
+        CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
+        POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
 
 Resources:
   GreatKingdomRestApi:
@@ -17,6 +23,8 @@ Resources:
     Properties:
       Name: great-kingdom-restapi
       StageName: Prod
+      AccessLogSetting:
+        DestinationArn: arn:aws:logs:us-east-1:309114741156:log-group:/aws/apigateway/omlo79fwk8/Dev:*
       Auth:
         Authorizers:
           LambdaAuthorizer:
@@ -45,9 +53,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref GameSessionDynamoDB
-      Environment:
-        Variables:
-          GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
       Events:
         RestPOST:
           Type: Api
@@ -67,9 +72,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref GameSessionDynamoDB
-      Environment:
-        Variables:
-          GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
       Events:
         RestGET:
           Type: Api
@@ -89,9 +91,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
-      Environment:
-        Variables:
-          USER_DYNAMODB: !Ref UserDynamoDB
       Events:
         RestGET:
           Type: Api
@@ -111,9 +110,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
-      Environment:
-        Variables:
-          USER_DYNAMODB: !Ref UserDynamoDB
       Events:
         RestPOST:
           Type: Api
@@ -131,9 +127,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
-      Environment:
-        Variables:
-          USER_DYNAMODB: !Ref UserDynamoDB
       Events:
         RestPOST:
           Type: Api
@@ -151,9 +144,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
-      Environment:
-        Variables:
-          USER_DYNAMODB: !Ref UserDynamoDB
       Events:
         RestPOST:
           Type: Api
@@ -171,9 +161,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
-      Environment:
-        Variables:
-          USER_DYNAMODB: !Ref UserDynamoDB
       Events:
         RestPOST:
           Type: Api
@@ -239,10 +226,6 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref WebSocketConnectionDynamoDB
         - AmazonSQSFullAccess
-      Environment:
-        Variables:
-          CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
-          POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
 
   WebSocketConnectPermission:
     Type: AWS::Lambda::Permission
@@ -276,10 +259,6 @@ Resources:
         - AmazonSQSFullAccess
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
-      Environment:
-        Variables:
-          CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
-          POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
 
   WebSocketDisconnectPermission:
     Type: AWS::Lambda::Permission
@@ -313,10 +292,6 @@ Resources:
         - AmazonSQSFullAccess
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
-      Environment:
-        Variables:
-          CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
-          POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
 
   WebSocketMovePermission:
     Type: AWS::Lambda::Permission
@@ -350,10 +325,6 @@ Resources:
         - AmazonSQSFullAccess
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
-      Environment:
-        Variables:
-          CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
-          POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
 
   WebSocketChatPermission:
     Type: AWS::Lambda::Permission
@@ -402,10 +373,6 @@ Resources:
       Environment:
         Variables:
           API_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketDevStage}"
-          CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
-          GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
-          USER_DYNAMODB: !Ref UserDynamoDB
-          POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
       Events:
         WebSocketEventSQS:
           Type: SQS
