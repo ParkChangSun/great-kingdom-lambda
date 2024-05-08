@@ -22,9 +22,10 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
+	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{req.RequestContext.ConnectionID})
 	out, err := dynamodb.NewFromConfig(cfg).DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName:    aws.String(os.Getenv("CONNECTION_DYNAMODB")),
-		Key:          game.GetConnectionDynamoDBKey(req.RequestContext.ConnectionID),
+		Key:          key,
 		ReturnValues: "ALL_OLD",
 	})
 	if err != nil {

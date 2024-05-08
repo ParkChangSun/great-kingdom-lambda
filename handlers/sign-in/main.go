@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sam-app/game"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -36,7 +36,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	userItem.RefreshToken = game.NewRefreshToken()
+	userItem.RefreshToken = game.NewRefreshToken(userItem.UserId)
 	err = userItem.UpdateRefreshToken(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
@@ -46,21 +46,13 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers: map[string]string{
-			"Access-Control-Allow-Origin":      "http://localhost:5173",
+			// "Access-Control-Allow-Origin":      "http://localhost:5173",
 			"Access-Control-Allow-Credentials": "true",
 		},
 		MultiValueHeaders: map[string][]string{
 			"Set-Cookie": {
-				fmt.Sprint(
-					"GreatKingdomAuth=bearer ",
-					signedToken,
-					";domain=execute-api.us-east-1.amazonaws.com;path=/;Max-Age=900;HttpOnly;SameSite=None;Secure;Partitioned",
-				),
-				fmt.Sprint(
-					"GreatKingdomRefresh=",
-					userItem.RefreshToken,
-					";domain=execute-api.us-east-1.amazonaws.com;path=/;Max-Age=3600;HttpOnly;SameSite=None;Secure;Partitioned",
-				),
+				game.GetCookieHeader("GreatKingdomAuth", signedToken, time.Now().Add(game.AUTHEXPIRES)),
+				game.GetCookieHeader("GreatKingdomRefresh", signedToken, time.Now().Add(game.REFRESHEXPIRES)),
 			},
 		},
 		Body: string(resBody),

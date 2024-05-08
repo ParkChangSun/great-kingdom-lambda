@@ -46,11 +46,14 @@ func (s GameSessionDDBItem) UpdateGame(ctx context.Context) error {
 	cfg, _ := config.LoadDefaultConfig(ctx)
 
 	update := expression.Set(expression.Name("Game"), expression.Value(s.Game))
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
+	condition := expression.AttributeExists(expression.Name("GameSessionId"))
+	expr, _ := expression.NewBuilder().WithUpdate(update).WithCondition(condition).Build()
 
+	key, _ := attributevalue.MarshalMap(struct{ GameSessionId string }{s.GameSessionId})
 	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-		Key:                       GetGameSessionDynamoDBKey(s.GameSessionId),
+		Key:                       key,
+		ConditionExpression:       expr.Condition(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),
@@ -72,11 +75,13 @@ func (s GameSessionDDBItem) UpdatePlayers(ctx context.Context) error {
 		expression.Name("Players"),
 		expression.Value(s.Players),
 	)
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
+	condition := expression.AttributeExists(expression.Name("GameSessionId"))
+	expr, _ := expression.NewBuilder().WithUpdate(update).WithCondition(condition).Build()
 
 	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
 		Key:                       GetGameSessionDynamoDBKey(s.GameSessionId),
+		ConditionExpression:       expr.Condition(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),
@@ -209,18 +214,14 @@ type ConnectionDDBItem struct {
 	UserId        string
 }
 
-func GetConnectionDynamoDBKey(connectionId string) map[string]types.AttributeValue {
-	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{connectionId})
-	return key
-}
-
 func GetConnection(ctx context.Context, connectionId string) (ConnectionDDBItem, error) {
 	record := ConnectionDDBItem{}
 	cfg, _ := config.LoadDefaultConfig(ctx)
 
+	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{connectionId})
 	query, err := dynamodb.NewFromConfig(cfg).GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
-		Key:       GetConnectionDynamoDBKey(connectionId),
+		Key:       key,
 	})
 	if err != nil {
 		return record, err
@@ -239,7 +240,7 @@ type UserDDBItem struct {
 }
 
 func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
-	item := UserDDBItem{}
+
 	cfg, _ := config.LoadDefaultConfig(ctx)
 
 	k, _ := attributevalue.MarshalMap(struct{ UserId string }{UserId: userId})
@@ -248,11 +249,16 @@ func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
 		Key:       k,
 	})
 	if err != nil {
-		return item, err
+		return UserDDBItem{}, err
 	}
 
+	item := UserDDBItem{}
 	attributevalue.UnmarshalMap(query.Item, &item)
 	return item, nil
+}
+
+func GetUserByRefreshToken() {
+
 }
 
 func (u UserDDBItem) UpdateRecord(ctx context.Context) error {
@@ -268,13 +274,14 @@ func (u UserDDBItem) UpdateRecord(ctx context.Context) error {
 		expression.Name("D"),
 		expression.Value(u.D),
 	)
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
+	condition := expression.AttributeExists(expression.Name("UserId"))
+	expr, _ := expression.NewBuilder().WithUpdate(update).WithCondition(condition).Build()
 
 	k, _ := attributevalue.MarshalMap(struct{ UserId string }{UserId: u.UserId})
-
 	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(os.Getenv("USER_DYNAMODB")),
 		Key:                       k,
+		ConditionExpression:       expr.Condition(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),
@@ -292,13 +299,15 @@ func (u UserDDBItem) UpdateRefreshToken(ctx context.Context) error {
 		expression.Name("RefreshToken"),
 		expression.Value(u.RefreshToken),
 	)
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
+	condition := expression.AttributeExists(expression.Name("UserId"))
+	expr, _ := expression.NewBuilder().WithUpdate(update).WithCondition(condition).Build()
 
 	k, _ := attributevalue.MarshalMap(struct{ UserId string }{UserId: u.UserId})
 
 	_, err := dynamodb.NewFromConfig(cfg).UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(os.Getenv("USER_DYNAMODB")),
 		Key:                       k,
+		ConditionExpression:       expr.Condition(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),

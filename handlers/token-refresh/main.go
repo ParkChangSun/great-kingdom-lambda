@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"sam-app/game"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -13,36 +13,30 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	reqBody := struct {
-		UserId       string
-		RefreshToken string
-	}{}
-	err := json.Unmarshal([]byte(req.Body), &reqBody)
+	cookie := req.Headers["Cookie"]
+	if !strings.Contains(cookie, "GreatKingdomRefresh") {
+		return events.APIGatewayProxyResponse{}, nil
+	}
+	payload, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomRefresh=")+20:], ";")
+	refreshTokenStr, err := base64.RawStdEncoding.DecodeString(payload)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
+	refreshToken := game.RefreshToken{}
+	json.Unmarshal(refreshTokenStr, &refreshToken)
+
 	userItem, err := game.GetUser(ctx, req.Body)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	refreshTokenStr, err := base64.RawStdEncoding.DecodeString(reqBody.RefreshToken)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-	refreshToken := game.RefreshToken{}
-	err = json.Unmarshal(refreshTokenStr, &refreshToken)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	if userItem.RefreshToken != reqBody.RefreshToken || refreshToken.Time.Before(time.Now()) {
+	if userItem.RefreshToken != string(refreshTokenStr) || refreshToken.Time.Before(time.Now()) {
 		userItem.RefreshToken = "logout"
 		userItem.UpdateRefreshToken(ctx)
 		return events.APIGatewayProxyResponse{
 			StatusCode: 401,
 			Headers: map[string]string{
-				"Access-Control-Allow-Origin":      "http://localhost:5173",
+				// "Access-Control-Allow-Origin":      "http://localhost:5173",
 				"Access-Control-Allow-Credentials": "true",
 			},
 		}, nil
@@ -53,7 +47,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	userItem.RefreshToken = game.NewRefreshToken()
+	userItem.RefreshToken = game.NewRefreshToken(userItem.UserId)
 	err = userItem.UpdateRefreshToken(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
@@ -62,21 +56,13 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers: map[string]string{
-			"Access-Control-Allow-Origin":      "http://localhost:5173",
+			// "Access-Control-Allow-Origin":      "http://localhost:5173",
 			"Access-Control-Allow-Credentials": "true",
 		},
 		MultiValueHeaders: map[string][]string{
 			"Set-Cookie": {
-				fmt.Sprint(
-					"GreatKingdomAuth=bearer ",
-					signedToken,
-					";domain=execute-api.us-east-1.amazonaws.com;path=/;Max-Age=900;HttpOnly;SameSite=None;Secure;Partitioned",
-				),
-				fmt.Sprint(
-					"GreatKingdomRefresh=",
-					userItem.RefreshToken,
-					";domain=execute-api.us-east-1.amazonaws.com;path=/;Max-Age=3600;HttpOnly;SameSite=None;Secure;Partitioned",
-				),
+				game.GetCookieHeader("GreatKingdomAuth", signedToken, time.Now().Add(game.AUTHEXPIRES)),
+				game.GetCookieHeader("GreatKingdomRefresh", userItem.RefreshToken, time.Now().Add(game.REFRESHEXPIRES)),
 			},
 		},
 	}, nil

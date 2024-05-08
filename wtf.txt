@@ -1,7 +1,9 @@
 ddb transaction atomic
 방 나오면 아직 삭제 안된거 완전한결과? 뭐 있었는데 그거
-도메인 쿠키 작업 웹페이지 레이아웃에 토큰리프레시
 스벨트 스토어는 새로고침하면 사라짐
+
+authorizer bearer 없애야함
+second index로 refresh key를 한다면? 괜찮을듯? 굳이 파싱할 필요도 없고
 
 
 

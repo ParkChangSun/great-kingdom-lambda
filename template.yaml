@@ -382,35 +382,44 @@ Resources:
   WebSocketConnectionDynamoDB:
     Type: AWS::DynamoDB::Table
     Properties:
+      BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: ConnectionId
           AttributeType: "S"
       KeySchema:
         - AttributeName: ConnectionId
           KeyType: "HASH"
-      BillingMode: PAY_PER_REQUEST
 
   GameSessionDynamoDB:
     Type: AWS::DynamoDB::Table
     Properties:
+      BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: GameSessionId
           AttributeType: "S"
       KeySchema:
         - AttributeName: GameSessionId
           KeyType: "HASH"
-      BillingMode: PAY_PER_REQUEST
 
   UserDynamoDB:
     Type: AWS::DynamoDB::Table
     Properties:
+      BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: UserId
+          AttributeType: "S"
+        - AttributeName: RefreshToken
           AttributeType: "S"
       KeySchema:
         - AttributeName: UserId
           KeyType: "HASH"
-      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+        - IndexName: RefreshToken
+          Projection:
+            ProjectionType: ALL
+          KeySchema: 
+            - AttributeName: RefreshToken
+              KeyType: "HASH"
 
 # Outputs:
 #   api:
