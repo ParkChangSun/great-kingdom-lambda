@@ -49,6 +49,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		UserUUID:     uuid.NewString(),
 		UserId:       body.Id,
 		PasswordHash: string(hash),
+		RefreshToken: "logout",
 	})
 	_, err = dynamodb.NewFromConfig(cfg).PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(os.Getenv("USER_DYNAMODB")),
@@ -58,7 +59,10 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	return events.APIGatewayProxyResponse{StatusCode: 201, Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
+	return events.APIGatewayProxyResponse{
+		StatusCode: 201,
+		Headers:    game.DefaultCORSHeaders,
+	}, nil
 }
 
 func main() {

@@ -21,8 +21,6 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	dbClient := dynamodb.NewFromConfig(cfg)
-
 	body := struct {
 		GameSessionName string
 	}{}
@@ -36,7 +34,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		GameSessionId:   id,
 		GameSessionName: body.GameSessionName,
 	})
-	_, err = dbClient.PutItem(ctx, &dynamodb.PutItemInput{
+	_, err = dynamodb.NewFromConfig(cfg).PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
 		Item:      item,
 	})
@@ -47,11 +45,8 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	b, _ := json.Marshal(struct{ GameSessionId string }{GameSessionId: id})
 	return events.APIGatewayProxyResponse{
 		StatusCode: 201,
-		Headers: map[string]string{
-			"Access-Control-Allow-Origin":      "http://localhost:5173",
-			"Access-Control-Allow-Credentials": "true",
-		},
-		Body: string(b),
+		Headers:    game.DefaultCORSHeaders,
+		Body:       string(b),
 	}, nil
 }
 

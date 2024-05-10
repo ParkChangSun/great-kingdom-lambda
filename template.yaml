@@ -16,6 +16,7 @@ Globals:
         USER_DYNAMODB: !Ref UserDynamoDB
         CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
         POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
+        WEB_CLIENT_ORIGIN: https://www.greatkingdom.net
 
 Resources:
   GreatKingdomRestApi:

@@ -18,12 +18,9 @@ func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTy
 		return events.APIGatewayCustomAuthorizerResponse{}, nil
 	}
 	payload, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomAuth=")+17:], ";")
-	tokenType, token, _ := strings.Cut(payload, " ")
-	if strings.Compare(tokenType, "bearer") != 0 {
-		return events.APIGatewayCustomAuthorizerResponse{}, fmt.Errorf("token type not matching")
-	}
+
 	claim := game.AuthTokenClaims{}
-	t, err := jwt.ParseWithClaims(token, &claim, func(t *jwt.Token) (interface{}, error) {
+	t, err := jwt.ParseWithClaims(payload, &claim, func(t *jwt.Token) (interface{}, error) {
 		return []byte("key"), nil
 	})
 	if err != nil {

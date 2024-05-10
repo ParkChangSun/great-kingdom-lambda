@@ -14,14 +14,13 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
+
 	body, _ := json.Marshal(userItem)
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
+		Headers:    game.DefaultCORSHeaders,
 		Body:       string(body),
-		Headers: map[string]string{
-			"Access-Control-Allow-Origin":      "http://localhost:5173",
-			"Access-Control-Allow-Credentials": "true",
-		}}, nil
+	}, nil
 }
 
 func main() {

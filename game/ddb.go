@@ -3,6 +3,7 @@ package game
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -234,13 +235,12 @@ func GetConnection(ctx context.Context, connectionId string) (ConnectionDDBItem,
 type UserDDBItem struct {
 	UserUUID     string
 	UserId       string
-	PasswordHash string
+	PasswordHash string `json:"-"`
+	RefreshToken string `json:"-"`
 	W, L, D      int
-	RefreshToken string
 }
 
 func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
-
 	cfg, _ := config.LoadDefaultConfig(ctx)
 
 	k, _ := attributevalue.MarshalMap(struct{ UserId string }{UserId: userId})
@@ -252,13 +252,39 @@ func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
 		return UserDDBItem{}, err
 	}
 
+	if len(query.Item) == 0 {
+		return UserDDBItem{}, fmt.Errorf("getuser: user not found")
+	}
+
 	item := UserDDBItem{}
 	attributevalue.UnmarshalMap(query.Item, &item)
 	return item, nil
 }
 
-func GetUserByRefreshToken() {
+func GetUserByRefreshToken(ctx context.Context, token string) (UserDDBItem, error) {
+	cfg, _ := config.LoadDefaultConfig(ctx)
 
+	key := expression.KeyEqual(expression.Key("RefreshToken"), expression.Value(token))
+	expr, _ := expression.NewBuilder().WithKeyCondition(key).Build()
+
+	query, err := dynamodb.NewFromConfig(cfg).Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(os.Getenv("USER_DYNAMODB")),
+		IndexName:                 aws.String("RefreshToken"),
+		KeyConditionExpression:    expr.KeyCondition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+	})
+	if err != nil {
+		return UserDDBItem{}, err
+	}
+
+	if query.Count != 0 {
+		return UserDDBItem{}, fmt.Errorf("getuserbyrefreshtoken: user not found")
+	}
+
+	item := []UserDDBItem{}
+	attributevalue.UnmarshalListOfMaps(query.Items, &item)
+	return item[0], nil
 }
 
 func (u UserDDBItem) UpdateRecord(ctx context.Context) error {

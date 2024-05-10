@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"sam-app/game"
 	"time"
 
@@ -20,15 +21,26 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 
 	userItem, err := game.GetUser(ctx, reqBody.Id)
 	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-	if userItem.UserId == "" {
-		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "id not found", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Allow-Origin":      os.Getenv("WEB_CLIENT_ORIGIN"),
+			},
+			Body: err.Error(),
+		}, nil
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(userItem.PasswordHash), []byte(reqBody.Password))
 	if err != nil {
-		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "incorrect password", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Allow-Origin":      os.Getenv("WEB_CLIENT_ORIGIN"),
+			},
+			Body: err.Error(),
+		}, nil
 	}
 
 	signedToken, err := game.NewAuthToken(userItem.UserId)
@@ -36,7 +48,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	userItem.RefreshToken = game.NewRefreshToken(userItem.UserId)
+	userItem.RefreshToken = game.NewRefreshToken()
 	err = userItem.UpdateRefreshToken(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
@@ -45,14 +57,11 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	resBody, _ := json.Marshal(struct{ Id string }{Id: userItem.UserId})
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
-		Headers: map[string]string{
-			// "Access-Control-Allow-Origin":      "http://localhost:5173",
-			"Access-Control-Allow-Credentials": "true",
-		},
+		Headers:    game.DefaultCORSHeaders,
 		MultiValueHeaders: map[string][]string{
 			"Set-Cookie": {
 				game.GetCookieHeader("GreatKingdomAuth", signedToken, time.Now().Add(game.AUTHEXPIRES)),
-				game.GetCookieHeader("GreatKingdomRefresh", signedToken, time.Now().Add(game.REFRESHEXPIRES)),
+				game.GetCookieHeader("GreatKingdomRefresh", userItem.RefreshToken, time.Now().Add(game.REFRESHEXPIRES)),
 			},
 		},
 		Body: string(resBody),

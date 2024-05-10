@@ -31,11 +31,8 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	body, _ := json.Marshal(items)
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
+		Headers:    game.DefaultCORSHeaders,
 		Body:       string(body),
-		Headers: map[string]string{
-			"Access-Control-Allow-Origin":      "http://localhost:5173",
-			"Access-Control-Allow-Credentials": "true",
-		},
 	}, nil
 }
 
