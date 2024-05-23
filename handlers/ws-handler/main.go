@@ -142,10 +142,10 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 
 			if msg.Move.Pass {
 				if gameSession.Game.Pass() {
-					if b, o := gameSession.Game.CountTerritory(); b > o {
+					if b, o := gameSession.Game.CountTerritory(); b > o+2 {
 						gameSession.UpdateGameResult(ctx, 0)
 						gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[0], " won."))
-					} else if b < o {
+					} else if b < o+2 {
 						gameSession.UpdateGameResult(ctx, 1)
 						gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[1], " won."))
 					} else {
@@ -172,10 +172,10 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 					}
 					if !movable {
 						gameSession.Game.Playing = false
-						if b, o := gameSession.Game.CountTerritory(); b > o {
+						if b, o := gameSession.Game.CountTerritory(); b > o+2 {
 							gameSession.UpdateGameResult(ctx, 0)
 							gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[0], " won."))
-						} else if b < o {
+						} else if b < o+2 {
 							gameSession.UpdateGameResult(ctx, 1)
 							gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[1], " won."))
 						} else {

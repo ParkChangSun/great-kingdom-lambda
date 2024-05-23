@@ -15,7 +15,7 @@ import (
 func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTypeRequest) (events.APIGatewayCustomAuthorizerResponse, error) {
 	cookie := req.Headers["Cookie"]
 	if !strings.Contains(cookie, "GreatKingdomAuth") {
-		return events.APIGatewayCustomAuthorizerResponse{}, nil
+		return events.APIGatewayCustomAuthorizerResponse{}, fmt.Errorf("Unauthorized")
 	}
 	payload, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomAuth=")+17:], ";")
 

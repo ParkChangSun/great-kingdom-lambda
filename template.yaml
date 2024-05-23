@@ -24,8 +24,6 @@ Resources:
     Properties:
       Name: great-kingdom-restapi
       StageName: Prod
-      AccessLogSetting:
-        DestinationArn: arn:aws:logs:us-east-1:309114741156:log-group:/aws/apigateway/omlo79fwk8/Dev:*
       Auth:
         Authorizers:
           LambdaAuthorizer:
@@ -34,6 +32,12 @@ Resources:
             Identity:
               Headers:
                 - Cookie
+      GatewayResponses:
+        Unauthorized:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'https://www.greatkingdom.net'"
+              Access-Control-Allow-Credentials: "'true'"
 
   AuthorizerFunction:
     Type: AWS::Serverless::Function
