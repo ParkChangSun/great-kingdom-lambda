@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"sam-app/game"
 	"slices"
@@ -58,15 +57,6 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			msg := game.ConnectionDDBItem{}
 			json.Unmarshal([]byte(record.Body), &msg)
 
-			// _, err := dbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-			// 	TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
-			// 	Key:       game.GetConnectionDynamoDBKey(msg.ConnectionId),
-			// })
-			// if err != nil {
-			// 	return err
-			// }
-
-			log.Printf("%+v", msg)
 			gameSession, err := game.GetGameSession(ctx, msg.GameSessionId)
 			if err != nil {
 				return err

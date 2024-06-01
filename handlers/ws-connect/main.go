@@ -10,6 +10,8 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
@@ -22,6 +24,18 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 
 	if _, ok := req.QueryStringParameters["GameSessionId"]; !ok {
 		return events.APIGatewayProxyResponse{}, err
+	}
+
+	if req.QueryStringParameters["GameSessionId"] == "globalchat" {
+		item, _ := attributevalue.MarshalMap(game.ConnectionDDBItem{
+			ConnectionId:  req.RequestContext.ConnectionID,
+			Timestamp:     req.RequestContext.RequestTimeEpoch,
+			GameSessionId: req.QueryStringParameters["GameSessionId"],
+			UserId:        req.RequestContext.Authorizer.(map[string]interface{})["UserId"].(string),
+		})
+		dynamodb.NewFromConfig(cfg).PutItem(ctx, &dynamodb.PutItemInput{TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")), Item: item})
+
+		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
 	msgbody, _ := json.Marshal(game.ConnectionDDBItem{

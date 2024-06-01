@@ -1,13 +1,15 @@
 일단 정상동작만 확인해
 
-방 나오면 아직 삭제 안된거 완전한결과? 뭐 있었는데 그거
-유저 못찾았을때 처리
-유저 로그인 회원가입 버튼 같은거로 선택할수있게
+make chat content db
+store user id stuff in browser? so reduce 1 db tx
+broadcast and save the contents
+
+방 나오면 아직 삭제 안된거 완전한결과? 뭐 있었는데 그거 or refetch every time
+token rotation mechanism
 
 
 
 나아중에해볼거
-logout 토큰값으로 쓰면 위험함
 한영전환
 api gateway 및 authorizer 캐시 제거
 아키텍처 변경
@@ -23,3 +25,4 @@ sqs 메시지 어트리뷰트에 따라 구조체 다르게 만들기? connect d
 게임 무브 요청에 다 합쳐놓음
 개발/배포 환경 분리
 깃허브 액션 cicd
+subprotocol

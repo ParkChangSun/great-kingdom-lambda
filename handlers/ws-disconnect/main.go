@@ -39,6 +39,10 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	}
 	item.Timestamp = req.RequestContext.RequestTimeEpoch
 
+	if item.GameSessionId == "globalchat" {
+		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
+	}
+
 	msgbody, _ := json.Marshal(item)
 	_, err = sqs.NewFromConfig(cfg).SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:       aws.String(os.Getenv("POST_MESSAGE_QUEUE")),
