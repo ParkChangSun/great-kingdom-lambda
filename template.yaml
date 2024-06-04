@@ -17,6 +17,8 @@ Globals:
         CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
         POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
         WEB_CLIENT_ORIGIN: https://www.greatkingdom.net
+        GLOBAL_CHAT_DYNAMODB: !Ref GlobalChatDynamoDB
+        WEBSOCKET_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketDevStage}"
 
 Resources:
   GreatKingdomRestApi:
@@ -413,9 +415,9 @@ Resources:
                 - "execute-api:ManageConnections"
               Resource:
                 - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
-      Environment:
-        Variables:
-          API_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketDevStage}"
+      # Environment:
+      #   Variables:
+      #     API_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketDevStage}"
       Events:
         WebSocketEventSQS:
           Type: SQS
@@ -472,6 +474,21 @@ Resources:
           KeySchema: 
             - AttributeName: RefreshToken
               KeyType: "HASH"
+
+  GlobalChatDynamoDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: ChatName
+          AttributeType: "S"
+        - AttributeName: Timestamp
+          AttributeType: "N"
+      KeySchema:
+        - AttributeName: ChatName
+          KeyType: "HASH"
+        - AttributeName: Timestamp
+          KeyType: "RANGE"
 
 # Outputs:
 #   api:

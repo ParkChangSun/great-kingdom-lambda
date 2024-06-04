@@ -7,6 +7,7 @@ broadcast and save the contents
 방 나오면 아직 삭제 안된거 완전한결과? 뭐 있었는데 그거 or refetch every time
 token rotation mechanism
 
+personal info not required!
 
 
 나아중에해볼거

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sam-app/game"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -52,9 +53,22 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	chat, _ := json.Marshal(struct{ Chat string }{fmt.Sprint(sender.UserId, data.Chat)})
+	now := time.Now()
+
+	// this goes to connect route
+	chatkey := expression.KeyEqual(expression.Key("ChatName"), expression.Value("globalchat"))
+	cexpr, _ := expression.NewBuilder().WithKeyCondition(chatkey).Build()
+	dynamodb.NewFromConfig(cfg).Query(ctx, &dynamodb.QueryInput{
+		TableName: aws.String(os.Getenv("WEBSOCKET_ENDPOINT")),
+		// ScanIndexForward: aws.Bool(true),
+		KeyConditionExpression:    cexpr.KeyCondition(),
+		ExpressionAttributeNames:  cexpr.Names(),
+		ExpressionAttributeValues: cexpr.Values(),
+	})
+
+	chat, _ := json.Marshal(struct{ Chat string }{fmt.Sprint(now.Format(time.TimeOnly), sender.UserId, data.Chat)})
 	wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
-		o.BaseEndpoint = aws.String(os.Getenv("API_ENDPOINT"))
+		o.BaseEndpoint = aws.String(os.Getenv("WEBSOCKET_ENDPOINT"))
 	})
 	for _, v := range receivers {
 		wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{

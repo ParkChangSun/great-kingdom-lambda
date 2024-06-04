@@ -129,7 +129,7 @@ func (s GameSessionDDBItem) BroadCastWebSocketMessage(ctx context.Context, paylo
 
 	cfg, _ := config.LoadDefaultConfig(ctx)
 	wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
-		o.BaseEndpoint = aws.String(os.Getenv("API_ENDPOINT"))
+		o.BaseEndpoint = aws.String(os.Getenv("WEBSOCKET_ENDPOINT"))
 	})
 
 	for _, c := range s.CurrentConnections {
