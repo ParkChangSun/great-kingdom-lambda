@@ -54,26 +54,33 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	}
 
 	now := time.Now()
+	chat := struct {
+		Chat      string
+		ChatName  string
+		Timestamp int64
+	}{
+		Chat:      fmt.Sprint(now.Format(time.TimeOnly), sender.UserId, data.Chat),
+		ChatName:  "globalchat",
+		Timestamp: now.UnixMicro(),
+	}
 
-	// this goes to connect route
-	chatkey := expression.KeyEqual(expression.Key("ChatName"), expression.Value("globalchat"))
-	cexpr, _ := expression.NewBuilder().WithKeyCondition(chatkey).Build()
-	dynamodb.NewFromConfig(cfg).Query(ctx, &dynamodb.QueryInput{
-		TableName: aws.String(os.Getenv("WEBSOCKET_ENDPOINT")),
-		// ScanIndexForward: aws.Bool(true),
-		KeyConditionExpression:    cexpr.KeyCondition(),
-		ExpressionAttributeNames:  cexpr.Names(),
-		ExpressionAttributeValues: cexpr.Values(),
+	item, _ := attributevalue.MarshalMap(chat)
+	_, err = dynamodb.NewFromConfig(cfg).PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(os.Getenv("GLOBAL_CHAT_DYNAMODB")),
+		Item:      item,
 	})
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
 
-	chat, _ := json.Marshal(struct{ Chat string }{fmt.Sprint(now.Format(time.TimeOnly), sender.UserId, data.Chat)})
+	b, _ := json.Marshal(chat)
 	wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
 		o.BaseEndpoint = aws.String(os.Getenv("WEBSOCKET_ENDPOINT"))
 	})
 	for _, v := range receivers {
 		wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
 			ConnectionId: aws.String(v.ConnectionId),
-			Data:         chat,
+			Data:         b,
 		})
 	}
 

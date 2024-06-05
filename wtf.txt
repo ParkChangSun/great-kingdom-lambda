@@ -1,12 +1,12 @@
 일단 정상동작만 확인해
 
-make chat content db
-store user id stuff in browser? so reduce 1 db tx
-broadcast and save the contents
-
 방 나오면 아직 삭제 안된거 완전한결과? 뭐 있었는데 그거 or refetch every time
-token rotation mechanism
+token rotation mechanism in fetch
 
+chat connection not deleted
+last msgs not sent
+
+main page readme
 personal info not required!
 
 
