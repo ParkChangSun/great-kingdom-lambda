@@ -23,6 +23,8 @@ const (
 	CHATEVENT  = "CHAT"
 	GAMEEVENT  = "GAME"
 	USEREVENT  = "USER"
+
+	GLOBALCHAT = "GLOBAL"
 )
 
 type User struct {

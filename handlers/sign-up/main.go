@@ -29,10 +29,10 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}{}
 	json.Unmarshal([]byte(req.Body), &body)
 
-	user, err := game.GetUser(ctx, body.Id)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
+	user, _ := game.GetUser(ctx, body.Id)
+	// if err != nil {
+	// 	return events.APIGatewayProxyResponse{}, err
+	// }
 	if user.UserId != "" {
 		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "id exists", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
 	}

@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"sam-app/game"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -59,7 +59,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		ChatName  string
 		Timestamp int64
 	}{
-		Chat:      fmt.Sprint(now.Format(time.TimeOnly), sender.UserId, data.Chat),
+		Chat:      strings.Join([]string{now.Format(time.TimeOnly), sender.UserId, data.Chat}, " "),
 		ChatName:  "globalchat",
 		Timestamp: now.UnixMicro(),
 	}

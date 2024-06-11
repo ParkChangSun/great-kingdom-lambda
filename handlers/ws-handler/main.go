@@ -13,6 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
@@ -191,6 +193,49 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			}
 
 			gameSession.BroadCastChat(ctx, fmt.Sprint(msg.UserId, " : ", msg.Chat))
+
+		case game.GLOBALCHAT:
+			msg := game.ConnectionDDBItem{}
+			json.Unmarshal([]byte(record.Body), &msg)
+
+			chatkey := expression.KeyEqual(expression.Key("ChatName"), expression.Value("globalchat"))
+			expr, _ := expression.NewBuilder().WithKeyCondition(chatkey).Build()
+			out, err := dynamodb.NewFromConfig(cfg).Query(ctx, &dynamodb.QueryInput{
+				TableName: aws.String(os.Getenv("GLOBAL_CHAT_DYNAMODB")),
+				// ScanIndexForward: aws.Bool(true),
+				KeyConditionExpression:    expr.KeyCondition(),
+				ExpressionAttributeNames:  expr.Names(),
+				ExpressionAttributeValues: expr.Values(),
+			})
+			if err != nil {
+				return err
+			}
+
+			lastmsgs := []struct {
+				Chat      string
+				ChatName  string
+				Timestamp int64
+			}{}
+			attributevalue.UnmarshalListOfMaps(out.Items, &lastmsgs)
+			payload := struct {
+				EventType string
+				Messages  []struct {
+					Chat      string
+					ChatName  string
+					Timestamp int64
+				}
+			}{
+				EventType: "lastchat",
+				Messages:  lastmsgs,
+			}
+			b, _ := json.Marshal(payload)
+
+			apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
+				o.BaseEndpoint = aws.String(os.Getenv("WEBSOCKET_ENDPOINT"))
+			}).PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
+				ConnectionId: aws.String(msg.ConnectionId),
+				Data:         b,
+			})
 
 		default:
 			return nil

@@ -1,17 +1,18 @@
 일단 정상동작만 확인해
 
-방 나오면 아직 삭제 안된거 완전한결과? 뭐 있었는데 그거 or refetch every time
-token rotation mechanism in fetch
+main page 
+한영전환
 
-chat connection not deleted
-last msgs not sent
-
-main page readme
-personal info not required!
+check
+websocket timeout
+signin signup error messages
+chat lastmsgs event
 
 
 나아중에해볼거
-한영전환
+readme
+sqs subscription filter
+query pagenate
 api gateway 및 authorizer 캐시 제거
 아키텍처 변경
 static에 데이터 넣기
