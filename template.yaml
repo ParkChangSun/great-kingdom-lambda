@@ -419,7 +419,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref WebSocketPingFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/Ping'
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/ping'
 
   WebSocketEventQueue:
     Type: AWS::SQS::Queue

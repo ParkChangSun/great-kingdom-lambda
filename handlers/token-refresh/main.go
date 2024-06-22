@@ -25,7 +25,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	refreshToken := game.RefreshToken{}
 	json.Unmarshal([]byte(refreshTokenDecode), &refreshToken)
 
-	if refreshToken.Time.Before(time.Now()) {
+	if refreshToken.Time.Add(game.REFRESHEXPIRES).Before(time.Now()) {
 		userItem.RefreshToken = "logout"
 		userItem.UpdateRefreshToken(ctx)
 		return game.SignOutResponse, nil

@@ -280,7 +280,7 @@ func GetUserByRefreshToken(ctx context.Context, token string) (UserDDBItem, erro
 		return UserDDBItem{}, err
 	}
 
-	if query.Count != 0 {
+	if query.Count == 0 {
 		return UserDDBItem{}, fmt.Errorf("getuserbyrefreshtoken: user not found")
 	}
 

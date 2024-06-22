@@ -27,7 +27,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 				"Access-Control-Allow-Credentials": "true",
 				"Access-Control-Allow-Origin":      os.Getenv("WEB_CLIENT_ORIGIN"),
 			},
-			Body: err.Error(),
+			Body: "id not found",
 		}, nil
 	}
 
@@ -39,7 +39,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 				"Access-Control-Allow-Credentials": "true",
 				"Access-Control-Allow-Origin":      os.Getenv("WEB_CLIENT_ORIGIN"),
 			},
-			Body: err.Error(),
+			Body: "password incorrect",
 		}, nil
 	}
 

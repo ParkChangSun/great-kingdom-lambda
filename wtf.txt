@@ -1,15 +1,12 @@
 일단 정상동작만 확인해
 
-main page 
-한영전환
-
-check
-websocket timeout
-signin signup error messages
-chat lastmsgs event
+seo
+lambda@edge
+refresh expire message -> signoutresponse change
 
 
 나아중에해볼거
+copilot
 readme
 sqs subscription filter
 query pagenate
