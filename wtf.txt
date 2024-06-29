@@ -1,15 +1,15 @@
-일단 정상동작만 확인해
+TODO
+seo - by language/region
+<link rel="alternate" hreflang="en" href="https://minesweeper.online/">
 
-seo
-lambda@edge
-refresh expire message -> signoutresponse change
+scroll functionality check
 
 
 나아중에해볼거
 copilot
+global chat websocket event seperate
 readme
 sqs subscription filter
-query pagenate
 api gateway 및 authorizer 캐시 제거
 아키텍처 변경
 static에 데이터 넣기
@@ -23,5 +23,10 @@ sqs 메시지 어트리뷰트에 따라 구조체 다르게 만들기? connect d
 웹소켓 클라이언트에 메시지 보낼때 다보내게되는데... 그냥 분리할까?
 게임 무브 요청에 다 합쳐놓음
 개발/배포 환경 분리
-깃허브 액션 cicd
+깃허브 액션 cicd / test environment
 subprotocol
+lambda adapter deploy
+onmount return function
+svelte await statement
+send room data when joined -> seperation
+sst - does not require login or sth

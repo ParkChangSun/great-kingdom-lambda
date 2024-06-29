@@ -170,10 +170,14 @@ func (s GameSessionDDBItem) BroadCastUser(ctx context.Context) {
 		EventType          string
 		Players            []User
 		CurrentConnections []User
+		GameSessionName    string
+		GameSessionId      string
 	}{
 		EventType:          USEREVENT,
 		Players:            s.Players,
 		CurrentConnections: s.CurrentConnections,
+		GameSessionName:    s.GameSessionName,
+		GameSessionId:      s.GameSessionId,
 	})
 }
 

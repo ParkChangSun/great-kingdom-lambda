@@ -42,6 +42,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
+	resBody, _ := json.Marshal(struct{ Id string }{Id: userItem.UserId})
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers:    game.DefaultCORSHeaders,
@@ -51,6 +52,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 				game.GetCookieHeader("GreatKingdomRefresh", userItem.RefreshToken, time.Now().Add(game.REFRESHEXPIRES)),
 			},
 		},
+		Body: string(resBody),
 	}, nil
 }
 

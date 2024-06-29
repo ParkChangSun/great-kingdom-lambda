@@ -134,15 +134,12 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 
 			if msg.Move.Pass {
 				if gameSession.Game.Pass() {
-					if b, o := gameSession.Game.CountTerritory(); b > o+2 {
+					if b, o := gameSession.Game.CountTerritory(); b >= o+3 {
 						gameSession.UpdateGameResult(ctx, 0)
 						gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[0], " won."))
-					} else if b < o+2 {
+					} else {
 						gameSession.UpdateGameResult(ctx, 1)
 						gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[1], " won."))
-					} else {
-						gameSession.UpdateGameResult(ctx, -1)
-						gameSession.BroadCastChat(ctx, "Game over. Draw.")
 					}
 				}
 			} else {
@@ -164,15 +161,12 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 					}
 					if !movable {
 						gameSession.Game.Playing = false
-						if b, o := gameSession.Game.CountTerritory(); b > o+2 {
+						if b, o := gameSession.Game.CountTerritory(); b >= o+3 {
 							gameSession.UpdateGameResult(ctx, 0)
 							gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[0], " won."))
-						} else if b < o+2 {
+						} else {
 							gameSession.UpdateGameResult(ctx, 1)
 							gameSession.BroadCastChat(ctx, fmt.Sprint("Game over. ", gameSession.Game.PlayersId[1], " won."))
-						} else {
-							gameSession.UpdateGameResult(ctx, -1)
-							gameSession.BroadCastChat(ctx, "Game over. Draw.")
 						}
 					}
 				}
@@ -201,8 +195,9 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			chatkey := expression.KeyEqual(expression.Key("ChatName"), expression.Value("globalchat"))
 			expr, _ := expression.NewBuilder().WithKeyCondition(chatkey).Build()
 			out, err := dynamodb.NewFromConfig(cfg).Query(ctx, &dynamodb.QueryInput{
-				TableName: aws.String(os.Getenv("GLOBAL_CHAT_DYNAMODB")),
-				// ScanIndexForward: aws.Bool(true),
+				TableName:                 aws.String(os.Getenv("GLOBAL_CHAT_DYNAMODB")),
+				ScanIndexForward:          aws.Bool(false),
+				Limit:                     aws.Int32(50),
 				KeyConditionExpression:    expr.KeyCondition(),
 				ExpressionAttributeNames:  expr.Names(),
 				ExpressionAttributeValues: expr.Values(),
@@ -210,6 +205,9 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 			if err != nil {
 				return err
 			}
+
+			lastKey := struct{ Timestamp int64 }{}
+			attributevalue.UnmarshalMap(out.LastEvaluatedKey, &lastKey)
 
 			lastmsgs := []struct {
 				Chat      string
@@ -224,9 +222,11 @@ func handler(ctx context.Context, req events.SQSEvent) error {
 					ChatName  string
 					Timestamp int64
 				}
+				LastScroll int64
 			}{
-				EventType: "lastchat",
-				Messages:  lastmsgs,
+				EventType:  "lastchat",
+				Messages:   lastmsgs,
+				LastScroll: lastKey.Timestamp,
 			}
 			b, _ := json.Marshal(payload)
 
