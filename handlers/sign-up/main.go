@@ -37,11 +37,16 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "id exists", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
 	}
 
+	idlen := regexp.MustCompile(`^[0-9a-zA-Z]{6,30}$`)
+	if !idlen.Match([]byte(body.Id)) {
+		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "invalid id", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
+	}
+
 	num := regexp.MustCompile(`.*[0-9]`)
 	eng := regexp.MustCompile(`.*[a-zA-Z]`)
 	bytelen := regexp.MustCompile(`^.{6,30}$`)
 	if !num.Match([]byte(body.Password)) || !eng.Match([]byte(body.Password)) || !bytelen.Match([]byte(body.Password)) {
-		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "password invalid", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
+		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "invalid password", Headers: map[string]string{"Access-Control-Allow-Origin": "*"}}, nil
 	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
 

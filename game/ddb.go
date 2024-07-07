@@ -23,6 +23,7 @@ const (
 	CHATEVENT  = "CHAT"
 	GAMEEVENT  = "GAME"
 	USEREVENT  = "USER"
+	SLOTEVENT  = "SLOT"
 
 	GLOBALCHAT = "GLOBAL"
 )
@@ -191,10 +192,7 @@ func (s GameSessionDDBItem) UpdateGameResult(ctx context.Context, winner int) er
 		return err
 	}
 
-	if winner == -1 {
-		blue.D++
-		orange.D++
-	} else if winner == 0 {
+	if winner == 0 {
 		blue.W++
 		orange.L++
 	} else if winner == 1 {
@@ -243,7 +241,7 @@ type UserDDBItem struct {
 	UserId       string
 	PasswordHash string `json:"-"`
 	RefreshToken string `json:"-"`
-	W, L, D      int
+	W, L         int
 }
 
 func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
@@ -302,9 +300,6 @@ func (u UserDDBItem) UpdateRecord(ctx context.Context) error {
 	).Set(
 		expression.Name("L"),
 		expression.Value(u.L),
-	).Set(
-		expression.Name("D"),
-		expression.Value(u.D),
 	)
 	condition := expression.AttributeExists(expression.Name("UserId"))
 	expr, _ := expression.NewBuilder().WithUpdate(update).WithCondition(condition).Build()

@@ -28,6 +28,9 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
+	if body.GameSessionName == "" {
+		return events.APIGatewayProxyResponse{}, err
+	}
 
 	id := uuid.New().String()
 	item, _ := attributevalue.MarshalMap(game.GameSessionDDBItem{

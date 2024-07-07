@@ -1,8 +1,10 @@
 TODO
-seo - by language/region
-<link rel="alternate" hreflang="en" href="https://minesweeper.online/">
+scroll when scroll is down
+watcher to player
 
+untested features
 scroll functionality check
+watcher to player
 
 
 나아중에해볼거
@@ -12,7 +14,6 @@ readme
 sqs subscription filter
 api gateway 및 authorizer 캐시 제거
 아키텍처 변경
-static에 데이터 넣기
 마지막 수 하이라이트
 수많은 에러 핸들링 - 핸들러에서 에러 발생하면 메시지로 알려줘야함
 잘못된 리퀘스트 오면 새로고침 시키기?
@@ -21,6 +22,7 @@ ddb getitem 데이터가 없을때 에러아닌거 처리
 게임 로직 리팩토링
 sqs 메시지 어트리뷰트에 따라 구조체 다르게 만들기? connect disconnect 구조가 같음
 웹소켓 클라이언트에 메시지 보낼때 다보내게되는데... 그냥 분리할까?
+userid exists custom error
 게임 무브 요청에 다 합쳐놓음
 개발/배포 환경 분리
 깃허브 액션 cicd / test environment
@@ -29,4 +31,4 @@ lambda adapter deploy
 onmount return function
 svelte await statement
 send room data when joined -> seperation
-sst - does not require login or sth
+sst - does not require login or sth - google next.js sst
