@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sam-app/game"
+	"sam-app/auth"
+	"sam-app/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -26,12 +27,12 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	items := []game.GameSessionDDBItem{}
+	items := []ddb.GameSessionDDBItem{}
 	attributevalue.UnmarshalListOfMaps(out.Items, &items)
 	body, _ := json.Marshal(items)
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
-		Headers:    game.DefaultCORSHeaders,
+		Headers:    auth.DefaultCORSHeaders,
 		Body:       string(body),
 	}, nil
 }

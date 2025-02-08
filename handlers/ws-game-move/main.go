@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"sam-app/awsutils"
+	"sam-app/ddb"
 	"sam-app/game"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -26,12 +28,12 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	item, err := game.GetConnection(ctx, req.RequestContext.ConnectionID)
+	item, err := ddb.GetConnection(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	msgbody, _ := json.Marshal(game.GameMoveSQSRecord{
+	msgbody, _ := json.Marshal(awsutils.GameMoveSQSRecord{
 		Timestamp:     req.RequestContext.RequestTimeEpoch,
 		ConnectionId:  item.ConnectionId,
 		UserId:        item.UserId,
@@ -44,7 +46,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		MessageBody:    aws.String(string(msgbody)),
 		MessageGroupId: aws.String(item.GameSessionId),
 		MessageAttributes: map[string]types.MessageAttributeValue{
-			"EventType": {DataType: aws.String("String"), StringValue: aws.String(game.GAMEEVENT)},
+			"EventType": {DataType: aws.String("String"), StringValue: aws.String(awsutils.GAMEEVENT)},
 		},
 	})
 	if err != nil {

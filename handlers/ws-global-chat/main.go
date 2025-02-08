@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sam-app/game"
+	"sam-app/ddb"
 	"strings"
 	"time"
 
@@ -29,7 +29,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	sender, err := game.GetConnection(ctx, req.RequestContext.ConnectionID)
+	sender, err := ddb.GetConnection(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
@@ -47,7 +47,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	receivers := []game.ConnectionDDBItem{}
+	receivers := []ddb.ConnectionDDBItem{}
 	err = attributevalue.UnmarshalListOfMaps(out.Items, &receivers)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err

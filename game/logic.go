@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"log"
+	"time"
 )
 
 type CellStatus int
@@ -154,7 +155,7 @@ func (g Game) checkOccupied(p Point) map[Point]struct{} {
 
 func (g *Game) Move(p Point) (finished bool, err error) {
 	if c, _ := g.getCellStatus(p); c != EmptyCell {
-		return false, fmt.Errorf(fmt.Sprintf("%+v is not playable point", p))
+		return false, fmt.Errorf("%+v is not playable point", p)
 	}
 
 	g.PassFlag = false
@@ -209,4 +210,17 @@ func (g Game) CountTerritory() (blue int, orange int) {
 		}
 	}
 	return
+}
+
+func (g *Game) StartNewGame(blueId string, orangeId string) {
+	g.Turn = 1
+	g.PassFlag = false
+	g.Playing = true
+	g.Board = [9][9]CellStatus{}
+	g.Board[4][4] = Neutral
+	if time.Now().UnixMilli()%2 == 0 {
+		g.PlayersId = [2]string{blueId, orangeId}
+	} else {
+		g.PlayersId = [2]string{orangeId, blueId}
+	}
 }

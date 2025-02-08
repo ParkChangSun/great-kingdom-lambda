@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sam-app/game"
+	"sam-app/awsutils"
+	"sam-app/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -27,7 +28,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	}
 
 	if req.QueryStringParameters["GameSessionId"] == "globalchat" {
-		c := game.ConnectionDDBItem{
+		c := ddb.ConnectionDDBItem{
 			ConnectionId:  req.RequestContext.ConnectionID,
 			Timestamp:     req.RequestContext.RequestTimeEpoch,
 			GameSessionId: req.QueryStringParameters["GameSessionId"],
@@ -43,7 +44,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 			MessageBody:    aws.String(string(msgbody)),
 			MessageGroupId: aws.String(req.QueryStringParameters["GameSessionId"]),
 			MessageAttributes: map[string]types.MessageAttributeValue{
-				"EventType": {DataType: aws.String("String"), StringValue: aws.String(game.GLOBALCHAT)},
+				"EventType": {DataType: aws.String("String"), StringValue: aws.String(awsutils.GLOBALCHAT)},
 			},
 		})
 		if err != nil {
@@ -53,7 +54,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
-	msgbody, _ := json.Marshal(game.ConnectionDDBItem{
+	msgbody, _ := json.Marshal(ddb.ConnectionDDBItem{
 		ConnectionId:  req.RequestContext.ConnectionID,
 		Timestamp:     req.RequestContext.RequestTimeEpoch,
 		GameSessionId: req.QueryStringParameters["GameSessionId"],
@@ -66,7 +67,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		MessageBody:    aws.String(string(msgbody)),
 		MessageGroupId: aws.String(req.QueryStringParameters["GameSessionId"]),
 		MessageAttributes: map[string]types.MessageAttributeValue{
-			"EventType": {DataType: aws.String("String"), StringValue: aws.String(game.JOINEVENT)},
+			"EventType": {DataType: aws.String("String"), StringValue: aws.String(awsutils.JOINEVENT)},
 		},
 	})
 	if err != nil {

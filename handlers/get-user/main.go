@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"sam-app/game"
+	"sam-app/auth"
+	"sam-app/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	userItem, err := game.GetUser(ctx, req.QueryStringParameters["UserId"])
+	userItem, err := ddb.GetUser(ctx, req.QueryStringParameters["UserId"])
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
@@ -18,7 +19,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	body, _ := json.Marshal(userItem)
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
-		Headers:    game.DefaultCORSHeaders,
+		Headers:    auth.DefaultCORSHeaders,
 		Body:       string(body),
 	}, nil
 }

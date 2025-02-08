@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sam-app/game"
+	"sam-app/auth"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -19,7 +19,7 @@ func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTy
 	}
 	payload, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomAuth=")+17:], ";")
 
-	claim := game.AuthTokenClaims{}
+	claim := auth.AuthTokenClaims{}
 	t, err := jwt.ParseWithClaims(payload, &claim, func(t *jwt.Token) (interface{}, error) {
 		return []byte("key"), nil
 	})

@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sam-app/game"
+	"sam-app/auth"
+	"sam-app/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -33,7 +34,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 
 	id := uuid.New().String()
-	item, _ := attributevalue.MarshalMap(game.GameSessionDDBItem{
+	item, _ := attributevalue.MarshalMap(ddb.GameSessionDDBItem{
 		GameSessionId:   id,
 		GameSessionName: body.GameSessionName,
 	})
@@ -48,7 +49,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	b, _ := json.Marshal(struct{ GameSessionId string }{GameSessionId: id})
 	return events.APIGatewayProxyResponse{
 		StatusCode: 201,
-		Headers:    game.DefaultCORSHeaders,
+		Headers:    auth.DefaultCORSHeaders,
 		Body:       string(b),
 	}, nil
 }

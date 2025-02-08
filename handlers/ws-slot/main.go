@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sam-app/game"
+	"sam-app/awsutils"
+	"sam-app/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -17,12 +18,12 @@ import (
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 	cfg, _ := config.LoadDefaultConfig(ctx)
 
-	conn, err := game.GetConnection(ctx, req.RequestContext.ConnectionID)
+	conn, err := ddb.GetConnection(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	msgbody, _ := json.Marshal(game.GameChatSQSRecord{
+	msgbody, _ := json.Marshal(awsutils.GameChatSQSRecord{
 		Timestamp:     req.RequestContext.RequestTimeEpoch,
 		ConnectionId:  conn.ConnectionId,
 		UserId:        conn.UserId,
@@ -35,7 +36,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		MessageBody:    aws.String(string(msgbody)),
 		MessageGroupId: aws.String(conn.GameSessionId),
 		MessageAttributes: map[string]types.MessageAttributeValue{
-			"EventType": {DataType: aws.String("String"), StringValue: aws.String(game.SLOTEVENT)},
+			"EventType": {DataType: aws.String("String"), StringValue: aws.String(awsutils.SLOTEVENT)},
 		},
 	})
 	if err != nil {

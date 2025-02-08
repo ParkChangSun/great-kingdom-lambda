@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"sam-app/game"
+	"sam-app/auth"
+	"sam-app/ddb"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -12,32 +13,32 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	refreshTokenStr := game.ParseRefreshToken(req.Headers["Cookie"])
-	userItem, err := game.GetUserByRefreshToken(ctx, refreshTokenStr)
+	refreshTokenStr := auth.ParseRefreshToken(req.Headers["Cookie"])
+	userItem, err := ddb.GetUserByRefreshToken(ctx, refreshTokenStr)
 	if err != nil {
-		return game.SignOutResponse, nil
+		return auth.SignOutResponse, nil
 	}
 
 	refreshTokenDecode, err := base64.RawStdEncoding.DecodeString(refreshTokenStr)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
-	refreshToken := game.RefreshToken{}
+	refreshToken := auth.RefreshToken{}
 	json.Unmarshal([]byte(refreshTokenDecode), &refreshToken)
 
-	if refreshToken.Time.Add(game.REFRESHEXPIRES).Before(time.Now()) {
+	if refreshToken.Time.Add(auth.REFRESHEXPIRES).Before(time.Now()) {
 		userItem.RefreshToken = "logout"
-		userItem.UpdateRefreshToken(ctx)
-		return game.SignOutResponse, nil
+		userItem.SyncRefreshToken(ctx)
+		return auth.SignOutResponse, nil
 	}
 
-	signedToken, err := game.NewAuthToken(userItem.UserId)
+	signedToken, err := auth.NewAuthToken(userItem.UserId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	userItem.RefreshToken = game.NewRefreshToken()
-	err = userItem.UpdateRefreshToken(ctx)
+	userItem.RefreshToken = auth.NewRefreshToken()
+	err = userItem.SyncRefreshToken(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
@@ -45,11 +46,11 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	resBody, _ := json.Marshal(struct{ Id string }{Id: userItem.UserId})
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
-		Headers:    game.DefaultCORSHeaders,
+		Headers:    auth.DefaultCORSHeaders,
 		MultiValueHeaders: map[string][]string{
 			"Set-Cookie": {
-				game.GetCookieHeader("GreatKingdomAuth", signedToken, time.Now().Add(game.AUTHEXPIRES)),
-				game.GetCookieHeader("GreatKingdomRefresh", userItem.RefreshToken, time.Now().Add(game.REFRESHEXPIRES)),
+				auth.GetCookieHeader("GreatKingdomAuth", signedToken, time.Now().Add(auth.AUTHEXPIRES)),
+				auth.GetCookieHeader("GreatKingdomRefresh", userItem.RefreshToken, time.Now().Add(auth.REFRESHEXPIRES)),
 			},
 		},
 		Body: string(resBody),

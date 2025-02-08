@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sam-app/game"
+	"sam-app/awsutils"
+	"sam-app/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -26,12 +27,12 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	item, err := game.GetConnection(ctx, req.RequestContext.ConnectionID)
+	item, err := ddb.GetConnection(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	msgbody, _ := json.Marshal(game.GameChatSQSRecord{
+	msgbody, _ := json.Marshal(awsutils.GameChatSQSRecord{
 		Timestamp:     req.RequestContext.RequestTimeEpoch,
 		ConnectionId:  item.ConnectionId,
 		UserId:        item.UserId,
@@ -45,7 +46,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		MessageBody:    aws.String(string(msgbody)),
 		MessageGroupId: aws.String(item.GameSessionId),
 		MessageAttributes: map[string]types.MessageAttributeValue{
-			"EventType": {DataType: aws.String("String"), StringValue: aws.String(game.CHATEVENT)},
+			"EventType": {DataType: aws.String("String"), StringValue: aws.String(awsutils.CHATEVENT)},
 		},
 	})
 	if err != nil {

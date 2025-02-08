@@ -1,14 +1,20 @@
 TODO
-scroll when scroll is down
-watcher to player
 
 untested features
 scroll functionality check
-watcher to player
 
+지금한것
+리팩토링 ddb
+wshandler
+disconnect-deletecon 핸들러에서 처리하는게 좋을듯
+
+broadcastuser session정보는 따로 보내기?
+defaultcorsheader 옮기기
+game.playing lobby로 옮기기?
 
 나아중에해볼거
-copilot
+http api vs rest api?
+websocket game endpoints are all same
 global chat websocket event seperate
 readme
 sqs subscription filter
@@ -21,6 +27,7 @@ api gateway 및 authorizer 캐시 제거
 ddb getitem 데이터가 없을때 에러아닌거 처리
 게임 로직 리팩토링
 sqs 메시지 어트리뷰트에 따라 구조체 다르게 만들기? connect disconnect 구조가 같음
+sqs 에러 발생시 프린트 말고 어떻게 하지
 웹소켓 클라이언트에 메시지 보낼때 다보내게되는데... 그냥 분리할까?
 userid exists custom error
 게임 무브 요청에 다 합쳐놓음

@@ -1,4 +1,4 @@
-package game
+package auth
 
 import (
 	"encoding/base64"

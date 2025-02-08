@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"regexp"
-	"sam-app/game"
+	"sam-app/auth"
+	"sam-app/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -29,7 +30,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}{}
 	json.Unmarshal([]byte(req.Body), &body)
 
-	user, _ := game.GetUser(ctx, body.Id)
+	user, _ := ddb.GetUser(ctx, body.Id)
 	// if err != nil {
 	// 	return events.APIGatewayProxyResponse{}, err
 	// }
@@ -50,7 +51,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
 
-	data, _ := attributevalue.MarshalMap(game.UserDDBItem{
+	data, _ := attributevalue.MarshalMap(ddb.UserDDBItem{
 		UserUUID:     uuid.NewString(),
 		UserId:       body.Id,
 		PasswordHash: string(hash),
@@ -66,7 +67,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 
 	return events.APIGatewayProxyResponse{
 		StatusCode: 201,
-		Headers:    game.DefaultCORSHeaders,
+		Headers:    auth.DefaultCORSHeaders,
 	}, nil
 }
 

@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sam-app/game"
+	"sam-app/auth"
+	"sam-app/ddb"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -19,7 +20,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}{}
 	json.Unmarshal([]byte(req.Body), &reqBody)
 
-	userItem, err := game.GetUser(ctx, reqBody.Id)
+	userItem, err := ddb.GetUser(ctx, reqBody.Id)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
@@ -43,13 +44,13 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		}, nil
 	}
 
-	signedToken, err := game.NewAuthToken(userItem.UserId)
+	signedToken, err := auth.NewAuthToken(userItem.UserId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	userItem.RefreshToken = game.NewRefreshToken()
-	err = userItem.UpdateRefreshToken(ctx)
+	userItem.RefreshToken = auth.NewRefreshToken()
+	err = userItem.SyncRefreshToken(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
@@ -57,11 +58,11 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	resBody, _ := json.Marshal(struct{ Id string }{Id: userItem.UserId})
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
-		Headers:    game.DefaultCORSHeaders,
+		Headers:    auth.DefaultCORSHeaders,
 		MultiValueHeaders: map[string][]string{
 			"Set-Cookie": {
-				game.GetCookieHeader("GreatKingdomAuth", signedToken, time.Now().Add(game.AUTHEXPIRES)),
-				game.GetCookieHeader("GreatKingdomRefresh", userItem.RefreshToken, time.Now().Add(game.REFRESHEXPIRES)),
+				auth.GetCookieHeader("GreatKingdomAuth", signedToken, time.Now().Add(auth.AUTHEXPIRES)),
+				auth.GetCookieHeader("GreatKingdomRefresh", userItem.RefreshToken, time.Now().Add(auth.REFRESHEXPIRES)),
 			},
 		},
 		Body: string(resBody),
