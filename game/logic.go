@@ -2,8 +2,6 @@ package game
 
 import (
 	"fmt"
-	"log"
-	"time"
 )
 
 type CellStatus int
@@ -22,11 +20,10 @@ const (
 const CELLSTATUSOFFSET = 2
 
 type Game struct {
-	Turn      int
-	PassFlag  bool
-	Playing   bool
-	Board     [9][9]CellStatus
-	PlayersId [2]string
+	Turn     int
+	PassFlag bool
+	Playing  bool
+	Board    [9][9]CellStatus
 }
 
 type Point struct {
@@ -137,13 +134,11 @@ func (g Game) checkOccupied(p Point) map[Point]struct{} {
 				checkQueue = append(checkQueue, n)
 			}
 			if stat == defenser {
-				log.Print("point ", p, " return nil faced enemy when checklist ", checkedList)
 				return nil
 			}
 			if stat == Edge {
 				edgeCheck[edge] = true
 				if edgeCheck[0] && edgeCheck[1] && edgeCheck[2] && edgeCheck[3] {
-					log.Print("point ", p, " return nil edge check when checklist ", checkedList)
 					return nil
 				}
 			}
@@ -153,9 +148,9 @@ func (g Game) checkOccupied(p Point) map[Point]struct{} {
 	return checkedList
 }
 
-func (g *Game) Move(p Point) (finished bool, err error) {
+func (g *Game) Move(p Point) (finished bool, sieged bool, err error) {
 	if c, _ := g.getCellStatus(p); c != EmptyCell {
-		return false, fmt.Errorf("%+v is not playable point", p)
+		return false, false, fmt.Errorf("%+v is not playable point", p)
 	}
 
 	g.PassFlag = false
@@ -164,23 +159,33 @@ func (g *Game) Move(p Point) (finished bool, err error) {
 
 	for _, n := range p.getNeighbors() {
 		if s := g.checkSieged(n); s != nil {
-			finished = true
+			sieged = true
 			for t := range s {
 				g.putPiece(t, SIEGED)
+			}
+		}
+		if o := g.checkOccupied(n); o != nil {
+			for c := range o {
+				g.putPiece(c, attacker+CELLSTATUSOFFSET)
+			}
+		}
+	}
+	if sieged {
+		g.Playing = false
+		return
+	}
+
+	finished = true
+	for _, r := range g.Board {
+		for _, c := range r {
+			if c == EmptyCell {
+				finished = false
 			}
 		}
 	}
 	if finished {
 		g.Playing = false
 		return
-	}
-
-	for _, n := range p.getNeighbors() {
-		if o := g.checkOccupied(n); o != nil {
-			for c := range o {
-				g.putPiece(c, attacker+CELLSTATUSOFFSET)
-			}
-		}
 	}
 
 	g.Turn++
@@ -198,7 +203,7 @@ func (g *Game) Pass() (finished bool) {
 	return false
 }
 
-func (g Game) CountTerritory() (blue int, orange int) {
+func (g Game) CountTerritory() (blue int, orange int, winner int) {
 	for _, r := range g.Board {
 		for _, c := range r {
 			if c == BlueTerritory {
@@ -209,18 +214,18 @@ func (g Game) CountTerritory() (blue int, orange int) {
 			}
 		}
 	}
+	if blue >= orange+3 {
+		winner = 0
+	} else {
+		winner = 1
+	}
 	return
 }
 
-func (g *Game) StartNewGame(blueId string, orangeId string) {
+func (g *Game) StartNewGame() {
 	g.Turn = 1
 	g.PassFlag = false
 	g.Playing = true
 	g.Board = [9][9]CellStatus{}
 	g.Board[4][4] = Neutral
-	if time.Now().UnixMilli()%2 == 0 {
-		g.PlayersId = [2]string{blueId, orangeId}
-	} else {
-		g.PlayersId = [2]string{orangeId, blueId}
-	}
 }

@@ -1,41 +1,40 @@
-TODO
+지금
+로그인 회원가입 로그아웃 유저없을때 쿠키및헤더설정
+axios5분마다 만약 통신 있었으면 핑퐁 타이머 초기화
 
-untested features
-scroll functionality check
 
-지금한것
-리팩토링 ddb
-wshandler
-disconnect-deletecon 핸들러에서 처리하는게 좋을듯
+버그
+<p class="small">The id should contain a combination of 6 to 30 letters and numbers.</p>
+<p class="small">The password should contain a combination of 6 to 30 characters.</p>
 
-broadcastuser session정보는 따로 보내기?
-defaultcorsheader 옮기기
-game.playing lobby로 옮기기?
+
+기능 먼저
+연결되면 인풋 오픈
+
+
+부가적인 것
+main 태그 seo
+game start 분리
+sqs 에러 발생시 프린트 말고 어떻게 하지-커넥션에 에러 주기?
+게임 로직 게임종료관련 리팩토링
+로그인할 때 아이디 안줘도 될수도? 토큰받은후 getuser
+
 
 나아중에해볼거
-http api vs rest api?
-websocket game endpoints are all same
-global chat websocket event seperate
-readme
-sqs subscription filter
-api gateway 및 authorizer 캐시 제거
-아키텍처 변경
-마지막 수 하이라이트
-수많은 에러 핸들링 - 핸들러에서 에러 발생하면 메시지로 알려줘야함
-잘못된 리퀘스트 오면 새로고침 시키기?
-게임 데이터 저장
-ddb getitem 데이터가 없을때 에러아닌거 처리
-게임 로직 리팩토링
-sqs 메시지 어트리뷰트에 따라 구조체 다르게 만들기? connect disconnect 구조가 같음
-sqs 에러 발생시 프린트 말고 어떻게 하지
-웹소켓 클라이언트에 메시지 보낼때 다보내게되는데... 그냥 분리할까?
-userid exists custom error
-게임 무브 요청에 다 합쳐놓음
-개발/배포 환경 분리
-깃허브 액션 cicd / test environment
-subprotocol
-lambda adapter deploy
+사람들 모으기 seo
+prod dev 분리
+cloudformation 계층화
+refreshtoken "logout"인 경우 있을수도 있음 로직 다시 보기
 onmount return function
-svelte await statement
-send room data when joined -> seperation
-sst - does not require login or sth - google next.js sst
+arm64 httpapi
+
+
+안해도되는거
+유저 삭제
+
+
+
+테스트 목록
+회원가입/로그인/로그아웃/토큰리프레시/타임아웃
+방 생성/새로고침/방 입장/전체채팅
+게임시작/수 놓기/단수/패스/채팅

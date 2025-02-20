@@ -2,6 +2,7 @@ package ddb
 
 import (
 	"context"
+	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -16,3 +17,5 @@ func client(ctx context.Context) *dynamodb.Client {
 	}
 	return ddbClient
 }
+
+var ErrItemNotFound = errors.New("dynamodb item not found")
