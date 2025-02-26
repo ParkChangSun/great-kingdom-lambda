@@ -12,7 +12,7 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	items, err := ddb.ScanGameLobby(ctx)
+	items, err := ddb.ScanGameTable(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

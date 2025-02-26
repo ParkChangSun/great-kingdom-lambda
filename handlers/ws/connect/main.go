@@ -12,7 +12,7 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	if _, ok := req.QueryStringParameters["GameSessionId"]; !ok {
+	if _, ok := req.QueryStringParameters["GameTableId"]; !ok {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
 			Headers:    auth.CORSHeaders,
@@ -20,13 +20,13 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		}, nil
 	}
 
-	if req.QueryStringParameters["GameSessionId"] == "globalchat" {
+	if req.QueryStringParameters["GameTableId"] == "globalchat" {
 		r := ddb.Record{
 			EventType: vars.GLOBALCHAT,
 			ConnectionDDBItem: ddb.ConnectionDDBItem{
-				ConnectionId:  req.RequestContext.ConnectionID,
-				GameSessionId: req.QueryStringParameters["GameSessionId"],
-				UserId:        req.RequestContext.Authorizer.(map[string]interface{})["UserId"].(string),
+				ConnectionId: req.RequestContext.ConnectionID,
+				GameTableId:  req.QueryStringParameters["GameTableId"],
+				UserId:       req.RequestContext.Authorizer.(map[string]any)["UserId"].(string),
 			},
 			Timestamp: req.RequestContext.RequestTimeEpoch,
 		}
@@ -41,19 +41,14 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	r := ddb.Record{
 		EventType: vars.JOINEVENT,
 		ConnectionDDBItem: ddb.ConnectionDDBItem{
-			ConnectionId:  req.RequestContext.ConnectionID,
-			GameSessionId: req.QueryStringParameters["GameSessionId"],
-			UserId:        req.RequestContext.Authorizer.(map[string]interface{})["UserId"].(string),
+			ConnectionId: req.RequestContext.ConnectionID,
+			GameTableId:  req.QueryStringParameters["GameTableId"],
+			UserId:       req.RequestContext.Authorizer.(map[string]any)["UserId"].(string),
 		},
 		Timestamp: req.RequestContext.RequestTimeEpoch,
 	}
 
-	err := ddb.PutConnInPool(ctx, r.ConnectionDDBItem)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	err = awsutils.SendToQueue(ctx, r, r.GameSessionId)
+	err := awsutils.SendToQueue(ctx, r, r.GameTableId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

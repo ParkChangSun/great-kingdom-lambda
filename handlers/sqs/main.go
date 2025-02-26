@@ -14,13 +14,18 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-func joinEvent(ctx context.Context, record ddb.Record, l ddb.GameLobbyDDBItem) error {
+func joinEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) error {
+	err := ddb.PutConnInPool(ctx, record.ConnectionDDBItem)
+	if err != nil {
+		return err
+	}
+
 	l.Connections = append(l.Connections, record.ConnectionDDBItem)
 	if len(l.Players) < 2 {
 		l.Players = append(l.Players, record.UserId)
 	}
 
-	err := l.SyncConnections(ctx)
+	err = l.SyncConnections(ctx)
 	if err != nil {
 		return err
 	}
@@ -31,11 +36,11 @@ func joinEvent(ctx context.Context, record ddb.Record, l ddb.GameLobbyDDBItem) e
 	return nil
 }
 
-func leaveEvent(ctx context.Context, record ddb.Record, l ddb.GameLobbyDDBItem) error {
+func leaveEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) error {
 	l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == record.UserId })
 	l.Connections = slices.DeleteFunc(l.Connections, func(u ddb.ConnectionDDBItem) bool { return u.UserId == record.UserId })
 	if len(l.Connections) == 0 {
-		return l.DeleteFromPool(ctx)
+		return ddb.DeleteGameTable(ctx, l.GameTableId)
 	}
 
 	if l.Game.Playing && len(l.Players) < 2 {
@@ -60,7 +65,7 @@ func leaveEvent(ctx context.Context, record ddb.Record, l ddb.GameLobbyDDBItem) 
 	return nil
 }
 
-func chatEvent(ctx context.Context, record ddb.Record, l ddb.GameLobbyDDBItem) error {
+func chatEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) error {
 	msg := strings.Trim(record.Chat, " ")
 	if msg == "" {
 		return nil
@@ -71,7 +76,7 @@ func chatEvent(ctx context.Context, record ddb.Record, l ddb.GameLobbyDDBItem) e
 	return nil
 }
 
-func slotEvent(ctx context.Context, record ddb.Record, l ddb.GameLobbyDDBItem) error {
+func slotEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) error {
 	if l.Game.Playing {
 		return nil
 	} else if slices.ContainsFunc(l.Players, func(u string) bool { return u == record.UserId }) {
@@ -92,7 +97,7 @@ func slotEvent(ctx context.Context, record ddb.Record, l ddb.GameLobbyDDBItem) e
 	return nil
 }
 
-func gameEvent(ctx context.Context, record ddb.Record, l ddb.GameLobbyDDBItem) error {
+func gameEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) error {
 	if record.Move.Start && record.UserId == l.Players[0] && !l.Game.Playing && len(l.Players) == 2 {
 		l.StartNewGame()
 		err := l.SyncGame(ctx)
@@ -150,7 +155,7 @@ func handler(ctx context.Context, req events.SQSEvent) {
 		r := ddb.Record{}
 		json.Unmarshal([]byte(record.Body), &r)
 
-		l, err := ddb.GetGameLobby(ctx, r.GameSessionId)
+		l, err := ddb.GetGameTable(ctx, r.GameTableId)
 		if err != nil {
 			log.Print(err)
 			continue
@@ -175,6 +180,7 @@ func handler(ctx context.Context, req events.SQSEvent) {
 
 		if err != nil {
 			log.Print(err)
+			l.BroadcastChat(ctx, err.Error())
 			continue
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sam-app/auth"
+	"sam-app/awsutils"
 	"sam-app/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -17,11 +18,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 
 	body, _ := json.Marshal(userItem)
-	return events.APIGatewayProxyResponse{
-		StatusCode: 200,
-		Headers:    auth.CORSHeaders,
-		Body:       string(body),
-	}, nil
+	return awsutils.RESTResponse(200, auth.CORSHeaders, string(body)), nil
 }
 
 func main() {

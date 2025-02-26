@@ -1,31 +1,29 @@
 지금
-로그인 회원가입 로그아웃 유저없을때 쿠키및헤더설정
-axios5분마다 만약 통신 있었으면 핑퐁 타이머 초기화
+연결된후 풀에넣기/끊긴후 빼기 getconnect 도 그냥 sqs에서 할수있는데
 
 
 버그
 <p class="small">The id should contain a combination of 6 to 30 letters and numbers.</p>
 <p class="small">The password should contain a combination of 6 to 30 characters.</p>
+디폴트메시지는 {message:fdsa}
+unauth 401
 
 
 기능 먼저
-연결되면 인풋 오픈
 
 
 부가적인 것
 main 태그 seo
-game start 분리
-sqs 에러 발생시 프린트 말고 어떻게 하지-커넥션에 에러 주기?
+입장중입니다...
+글로벌챗 분리후 다시만들기 게임시작 분리
 게임 로직 게임종료관련 리팩토링
-로그인할 때 아이디 안줘도 될수도? 토큰받은후 getuser
+방목록은 unauth 입장은 auth로 하면 어떨까 웹소켓 auth
 
 
 나아중에해볼거
 사람들 모으기 seo
 prod dev 분리
 cloudformation 계층화
-refreshtoken "logout"인 경우 있을수도 있음 로직 다시 보기
-onmount return function
 arm64 httpapi
 
 

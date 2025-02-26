@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -29,27 +26,21 @@ func generatePolicy(principalID, effect, resource string, context map[string]int
 }
 
 func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTypeRequest) (events.APIGatewayCustomAuthorizerResponse, error) {
-	cookie := req.Headers["Cookie"]
+	// resource := fmt.Sprintf("%s:%s/%s/*", os.Getenv("ALLOWED_RESOURCES_PREFIX"), req.RequestContext.APIID, req.RequestContext.Stage)
 
-	if !strings.Contains(cookie, "GreatKingdomAuth=") {
-		return events.APIGatewayCustomAuthorizerResponse{}, nil
-	}
-
-	accessTokenStr, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomAuth=")+17:], ";")
+	authorization := req.Headers["Authorization"]
 	accessTokenClaims := jwt.RegisteredClaims{}
-	accessToken, err := jwt.ParseWithClaims(accessTokenStr, &accessTokenClaims, func(t *jwt.Token) (interface{}, error) {
+	accessToken, err := jwt.ParseWithClaims(authorization, &accessTokenClaims, func(t *jwt.Token) (any, error) {
 		return []byte("key"), nil
 	})
 	if err != nil {
-		return events.APIGatewayCustomAuthorizerResponse{}, err
+		return generatePolicy(accessTokenClaims.Subject, "Deny", req.MethodArn, nil), nil
 	}
-
-	resource := fmt.Sprintf("%s:%s/%s/*", os.Getenv("ALLOWED_RESOURCES_PREFIX"), req.RequestContext.APIID, req.RequestContext.Stage)
 
 	if accessToken.Valid {
-		return generatePolicy(accessTokenClaims.Subject, "Allow", resource, map[string]interface{}{"UserId": accessTokenClaims.Subject}), nil
+		return generatePolicy(accessTokenClaims.Subject, "Allow", req.MethodArn, map[string]any{"UserId": accessTokenClaims.Subject}), nil
 	}
-	return generatePolicy(accessTokenClaims.Subject, "Deny", resource, nil), nil
+	return generatePolicy(accessTokenClaims.Subject, "Deny", req.MethodArn, nil), nil
 }
 
 func main() {

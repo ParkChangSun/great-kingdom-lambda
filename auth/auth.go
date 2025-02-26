@@ -2,23 +2,39 @@ package auth
 
 import (
 	"net/http"
-	"os"
+	"sam-app/vars"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var CORSHeaders = map[string]string{
-	"Access-Control-Allow-Credentials": "true",
-	"Access-Control-Allow-Origin":      os.Getenv("WEB_CLIENT_ORIGIN"),
+const (
+	ACCESSEXPIRES  = time.Minute * 5
+	REFRESHEXPIRES = time.Minute * 15
+	EXPIRED        = time.Hour * -1
+)
+
+type Authenticate struct {
+	Id, Password string
 }
 
-func AuthHeaders(a, r string) map[string]string {
+type AuthBody struct {
+	Authorized      bool
+	AccessToken, Id string
+}
+
+var CORSHeaders = map[string]string{
+	"Access-Control-Allow-Credentials": "true",
+	"Access-Control-Allow-Origin":      vars.WEB_CLIENT_ORIGIN,
+}
+
+var ExpiredCookie = CookieHeader("GreatKingdomRefresh", "", time.Now().Add(EXPIRED))
+
+func AuthHeaders(r string) map[string]string {
 	return map[string]string{
 		"Access-Control-Allow-Credentials": "true",
-		"Access-Control-Allow-Origin":      os.Getenv("WEB_CLIENT_ORIGIN"),
+		"Access-Control-Allow-Origin":      vars.WEB_CLIENT_ORIGIN,
 		"Set-Cookie":                       CookieHeader("GreatKingdomRefresh", r, time.Now().Add(REFRESHEXPIRES)),
-		"Authorization":                    a,
 	}
 }
 
@@ -34,12 +50,6 @@ func CookieHeader(name string, value string, expires time.Time) string {
 	}
 	return authCookie.String()
 }
-
-const (
-	ACCESSEXPIRES  = time.Minute * 5
-	REFRESHEXPIRES = time.Minute * 15
-	EXPIRED        = time.Hour * -1
-)
 
 func GenerateTokenSet(userId string) (string, string, error) {
 	access := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{

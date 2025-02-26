@@ -30,7 +30,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		Move:              move,
 		Timestamp:         req.RequestContext.RequestTimeEpoch,
 	}
-	err = awsutils.SendToQueue(ctx, r, r.GameSessionId)
+	err = awsutils.SendToQueue(ctx, r, r.GameTableId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

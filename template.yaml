@@ -10,19 +10,28 @@ Globals:
     Handler: bootstrap
     Environment:
       Variables:
-        GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
+        GAME_TABLE_DYNAMODB: !Ref GameTableDynamoDB
         USER_DYNAMODB: !Ref UserDynamoDB
         CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
-        POST_MESSAGE_QUEUE: !Ref WebSocketEventQueue
+        WEBSOCKET_EVENT_QUEUE: !Ref WebSocketEventQueue
         WEB_CLIENT_ORIGIN: https://www.greatkingdom.net
-        GLOBAL_CHAT_DYNAMODB: !Ref GlobalChatDynamoDB
         WEBSOCKET_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketDevStage}"
 
 Resources:
-  GreatKingdomRestApi:
+  AuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/authorizer/
+      Environment:
+        Variables:
+          ALLOWED_RESOURCES_PREFIX: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}
+
+  RestApi:
     Type: AWS::Serverless::Api
     Properties:
-      Name: great-kingdom-restapi
+      Name: great-kingdom-rest
       StageName: Prod
       AlwaysDeploy: true
       Auth:
@@ -32,63 +41,63 @@ Resources:
             FunctionPayloadType: REQUEST
             Identity:
               Headers:
-                - Cookie
+                - Authorization
       GatewayResponses:
-        Unauthorized:
+        ACCESS_DENIED:
           ResponseParameters:
             Headers:
               Access-Control-Allow-Origin: "'https://www.greatkingdom.net'"
               Access-Control-Allow-Credentials: "'true'"
-
-  AuthorizerFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/authorizer/
-      Environment:
-        Variables:
-          ALLOWED_RESOURCES_PREFIX: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}
+        UNAUTHORIZED:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'https://www.greatkingdom.net'"
+              Access-Control-Allow-Credentials: "'true'"
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'https://www.greatkingdom.net'"
+        AllowCredentials: true
         
-  CreateGameSessionFunction:
+  RestCreateGameTableFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
     Properties:
-      CodeUri: handlers/rest/create-session/
+      CodeUri: handlers/rest/create-table/
       Policies:
         - DynamoDBCrudPolicy: 
-            TableName: !Ref GameSessionDynamoDB
+            TableName: !Ref GameTableDynamoDB
       Events:
         RestPOST:
           Type: Api
           Properties:
-            RestApiId: !Ref GreatKingdomRestApi
-            Path: /game
+            RestApiId: !Ref RestApi
+            Path: /table
             Method: POST
             Auth:
               Authorizer: LambdaAuthorizer
 
-  GetGameSessionsFunction:
+  RestGetGameTablesFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
     Properties:
-      CodeUri: handlers/rest/get-sessions/
+      CodeUri: handlers/rest/get-tables/
       Policies:
         - DynamoDBCrudPolicy: 
-            TableName: !Ref GameSessionDynamoDB
+            TableName: !Ref GameTableDynamoDB
       Events:
         RestGET:
           Type: Api
           Properties:
-            RestApiId: !Ref GreatKingdomRestApi
-            Path: /games
+            RestApiId: !Ref RestApi
+            Path: /tables
             Method: GET
             Auth:
               Authorizer: LambdaAuthorizer
 
-  GetUserFunction:
+  RestGetUserFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
@@ -101,32 +110,13 @@ Resources:
         RestGET:
           Type: Api
           Properties:
-            RestApiId: !Ref GreatKingdomRestApi
+            RestApiId: !Ref RestApi
             Path: /user
             Method: GET
             Auth:
               Authorizer: LambdaAuthorizer
 
-  SignOutFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/rest/sign-out/
-      Policies:
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref UserDynamoDB
-      Events:
-        RestPOST:
-          Type: Api
-          Properties:
-            RestApiId: !Ref GreatKingdomRestApi
-            Path: /signout
-            Method: POST
-            Auth:
-              Authorizer: LambdaAuthorizer
-
-  SignUpFunction:
+  RestSignUpFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
@@ -139,11 +129,30 @@ Resources:
         RestPOST:
           Type: Api
           Properties:
-            RestApiId: !Ref GreatKingdomRestApi
-            Path: /signup
+            RestApiId: !Ref RestApi
+            Path: /sign-up
             Method: POST
 
-  SignInFunction:
+  RestSignOutFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/rest/sign-out/
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref UserDynamoDB
+      Events:
+        RestPOST:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestApi
+            Path: /sign-out
+            Method: POST
+            Auth:
+              Authorizer: LambdaAuthorizer
+
+  RestSignInFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
@@ -156,11 +165,11 @@ Resources:
         RestPOST:
           Type: Api
           Properties:
-            RestApiId: !Ref GreatKingdomRestApi
-            Path: /signin
+            RestApiId: !Ref RestApi
+            Path: /sign-in
             Method: POST
 
-  RotateTokenFunction:
+  RestRotateTokenFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
@@ -173,8 +182,8 @@ Resources:
         RestPOST:
           Type: Api
           Properties:
-            RestApiId: !Ref GreatKingdomRestApi
-            Path: /tokenrotate
+            RestApiId: !Ref RestApi
+            Path: /rotate-token
             Method: POST
 
   WebSocketApi:
@@ -199,7 +208,7 @@ Resources:
       AuthorizerType: REQUEST
       AuthorizerUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
       IdentitySource: 
-        - route.request.header.Cookie
+        - route.request.header.Authorization
 
   WebSocketAuthorizerPermission:
     Type: AWS::Lambda::Permission
@@ -233,8 +242,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref WebSocketConnectionDynamoDB
-        - DynamoDBCrudPolicy:
-            TableName: !Ref GlobalChatDynamoDB
         - AmazonSQSFullAccess
 
   WebSocketConnectPermission:
@@ -367,14 +374,13 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref GlobalChatDynamoDB
-        - Statement:
-            - Effect: Allow
-              Action:
-                - "execute-api:ManageConnections"
-              Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
+        - AmazonAPIGatewayInvokeFullAccess
+        # - Statement:
+        #     - Effect: Allow
+        #       Action:
+        #         - "execute-api:ManageConnections"
+        #       Resource:
+        #         - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
 
   WebSocketGlobalChatPermission:
     Type: AWS::Lambda::Permission
@@ -407,12 +413,13 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
-        - Statement:
-            - Effect: Allow
-              Action:
-                - "execute-api:ManageConnections"
-              Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
+        - AmazonAPIGatewayInvokeFullAccess
+        # - Statement:
+        #     - Effect: Allow
+        #       Action:
+        #         - "execute-api:ManageConnections"
+        #       Resource:
+        #         - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
 
   WebSocketPingPermission:
     Type: AWS::Lambda::Permission
@@ -446,12 +453,13 @@ Resources:
         - AmazonSQSFullAccess
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
-        - Statement:
-            - Effect: Allow
-              Action:
-                - "execute-api:ManageConnections"
-              Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
+        - AmazonAPIGatewayInvokeFullAccess
+        # - Statement:
+        #     - Effect: Allow
+        #       Action:
+        #         - "execute-api:ManageConnections"
+        #       Resource:
+        #         - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
 
   WebSocketSlotPermission:
     Type: AWS::Lambda::Permission
@@ -488,17 +496,16 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref WebSocketConnectionDynamoDB
         - DynamoDBCrudPolicy:
-            TableName: !Ref GameSessionDynamoDB
+            TableName: !Ref GameTableDynamoDB
         - DynamoDBCrudPolicy:
             TableName: !Ref UserDynamoDB
-        - DynamoDBCrudPolicy:
-            TableName: !Ref GlobalChatDynamoDB
-        - Statement:
-            - Effect: Allow
-              Action:
-                - "execute-api:ManageConnections"
-              Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
+        - AmazonAPIGatewayInvokeFullAccess
+        # - Statement:
+        #     - Effect: Allow
+        #       Action:
+        #         - "execute-api:ManageConnections"
+        #       Resource:
+        #         - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
       Events:
         WebSocketEventSQS:
           Type: SQS
@@ -527,15 +534,15 @@ Resources:
           Projection:
             ProjectionType: ALL
 
-  GameSessionDynamoDB:
+  GameTableDynamoDB:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: GameLobbyId
+        - AttributeName: GameTableId
           AttributeType: "S"
       KeySchema:
-        - AttributeName: GameLobbyId
+        - AttributeName: GameTableId
           KeyType: "HASH"
 
   UserDynamoDB:
@@ -545,33 +552,9 @@ Resources:
       AttributeDefinitions:
         - AttributeName: UserId
           AttributeType: "S"
-        # - AttributeName: RefreshToken
-        #   AttributeType: "S"
       KeySchema:
         - AttributeName: UserId
           KeyType: "HASH"
-      # GlobalSecondaryIndexes:
-      #   - IndexName: RefreshToken
-      #     Projection:
-      #       ProjectionType: ALL
-      #     KeySchema: 
-      #       - AttributeName: RefreshToken
-      #         KeyType: "HASH"
-
-  # GlobalChatDynamoDB:
-  #   Type: AWS::DynamoDB::Table
-  #   Properties:
-  #     BillingMode: PAY_PER_REQUEST
-  #     AttributeDefinitions:
-  #       - AttributeName: ChatName
-  #         AttributeType: "S"
-  #       - AttributeName: Timestamp
-  #         AttributeType: "N"
-  #     KeySchema:
-  #       - AttributeName: ChatName
-  #         KeyType: "HASH"
-  #       - AttributeName: Timestamp
-  #         KeyType: "RANGE"
 
 # Outputs:
 #   api:

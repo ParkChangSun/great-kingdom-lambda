@@ -10,7 +10,7 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) {
-	awsutils.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, ddb.LobbyBroadcastPayload{EventType: "pong"})
+	awsutils.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, ddb.GameTableBroadcastPayload{EventType: "pong"})
 }
 
 func main() {

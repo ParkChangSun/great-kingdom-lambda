@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"encoding/json"
 	"sam-app/auth"
+	"sam-app/awsutils"
 	"sam-app/ddb"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -25,46 +24,34 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	u, err := ddb.GetUser(ctx, refreshTokenClaims.Subject)
+	user, err := ddb.GetUser(ctx, refreshTokenClaims.Subject)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	if !refreshToken.Valid {
-		u.RefreshToken = ""
-		err = u.SyncRefreshToken(ctx)
+	if !refreshToken.Valid || user.RefreshToken != refreshTokenStr {
+		user.RefreshToken = ""
+		err = user.SyncRefreshToken(ctx)
 		if err != nil {
 			return events.APIGatewayProxyResponse{}, err
 		}
-		return events.APIGatewayProxyResponse{
-			StatusCode: 200,
-			Headers: map[string]string{
-				"Access-Control-Allow-Credentials": "true",
-				"Access-Control-Allow-Origin":      os.Getenv("WEB_CLIENT_ORIGIN"),
-				"Set-Cookie":                       auth.CookieHeader("GreatKingdomRefresh", "", time.Now().Add(auth.EXPIRED)),
-			},
-		}, nil
+		body, _ := json.Marshal(auth.AuthBody{Authorized: false, AccessToken: "", Id: ""})
+		return awsutils.RESTResponse(200, auth.AuthHeaders(""), string(body)), nil
 	}
 
-	if u.RefreshToken != refreshTokenStr {
-		return events.APIGatewayProxyResponse{}, fmt.Errorf("invalid logout")
-	}
-
-	newAccessToken, newRefreshToken, err := auth.GenerateTokenSet(refreshTokenClaims.Subject)
+	a, r, err := auth.GenerateTokenSet(refreshTokenClaims.Subject)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	u.RefreshToken = newRefreshToken
-	err = u.SyncRefreshToken(ctx)
+	user.RefreshToken = r
+	err = user.SyncRefreshToken(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: 200,
-		Headers:    auth.AuthHeaders(newAccessToken, newRefreshToken),
-	}, nil
+	body, _ := json.Marshal(auth.AuthBody{Authorized: true, AccessToken: a, Id: user.UserId})
+	return awsutils.RESTResponse(200, auth.AuthHeaders(r), string(body)), nil
 }
 
 func main() {

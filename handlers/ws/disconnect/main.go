@@ -16,7 +16,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	if conn.GameSessionId == "globalchat" {
+	if conn.GameTableId == "globalchat" {
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
@@ -26,7 +26,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		Timestamp:         req.RequestContext.RequestTimeEpoch,
 	}
 
-	err = awsutils.SendToQueue(ctx, r, r.GameSessionId)
+	err = awsutils.SendToQueue(ctx, r, r.GameTableId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

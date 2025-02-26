@@ -3,7 +3,6 @@ package ddb
 import (
 	"context"
 	"log"
-	"os"
 	"sam-app/awsutils"
 	"sam-app/game"
 	"sam-app/vars"
@@ -18,84 +17,84 @@ import (
 	"github.com/google/uuid"
 )
 
-type GameLobbyDDBItem struct {
-	GameLobbyId   string
-	GameLobbyName string
+type GameTableDDBItem struct {
+	GameTableId   string
+	GameTableName string
 	Connections   []ConnectionDDBItem
 	Players       []string
 	CoinToss      []string
 	Game          game.Game
 }
 
-func GameLobbyDDBItemKey(gameLobbyId string) map[string]types.AttributeValue {
-	k, _ := attributevalue.MarshalMap(struct{ GameLobbyId string }{gameLobbyId})
+func GameTableDDBKey(gameTableId string) map[string]types.AttributeValue {
+	k, _ := attributevalue.MarshalMap(struct{ GameTableId string }{gameTableId})
 	return k
 }
 
-func PutLobbyInPool(ctx context.Context, lobbyName string) (string, error) {
+func PutGameTable(ctx context.Context, tableName string) (string, error) {
 	id := uuid.New().String()
-	item, _ := attributevalue.MarshalMap(GameLobbyDDBItem{
-		GameLobbyId:   id,
-		GameLobbyName: lobbyName,
+	item, _ := attributevalue.MarshalMap(GameTableDDBItem{
+		GameTableId:   id,
+		GameTableName: tableName,
 		Players:       []string{},
 		Connections:   []ConnectionDDBItem{},
 		CoinToss:      []string{},
 	})
 
 	_, err := client(ctx).PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
+		TableName: aws.String(vars.GAME_TABLE_DYNAMODB),
 		Item:      item,
 	})
 
 	return id, err
 }
 
-func (l GameLobbyDDBItem) DeleteFromPool(ctx context.Context) error {
+func DeleteGameTable(ctx context.Context, tableId string) error {
 	_, err := client(ctx).DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-		Key:       GameLobbyDDBItemKey(l.GameLobbyId),
+		TableName: aws.String(vars.GAME_TABLE_DYNAMODB),
+		Key:       GameTableDDBKey(tableId),
 	})
 
 	return err
 }
 
-func GetGameLobby(ctx context.Context, gameLobbyId string) (GameLobbyDDBItem, error) {
+func GetGameTable(ctx context.Context, gameTableId string) (GameTableDDBItem, error) {
 	query, err := client(ctx).GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-		Key:       GameLobbyDDBItemKey(gameLobbyId),
+		TableName: aws.String(vars.GAME_TABLE_DYNAMODB),
+		Key:       GameTableDDBKey(gameTableId),
 	})
 	if err != nil {
-		return GameLobbyDDBItem{}, err
+		return GameTableDDBItem{}, err
 	}
 	if query.Item == nil {
-		return GameLobbyDDBItem{}, ErrItemNotFound
+		return GameTableDDBItem{}, ErrItemNotFound
 	}
 
-	l := GameLobbyDDBItem{}
+	l := GameTableDDBItem{}
 	attributevalue.UnmarshalMap(query.Item, &l)
 	return l, nil
 }
 
-func ScanGameLobby(ctx context.Context) ([]GameLobbyDDBItem, error) {
+func ScanGameTable(ctx context.Context) ([]GameTableDDBItem, error) {
 	out, err := client(ctx).Scan(ctx, &dynamodb.ScanInput{
-		TableName: aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
+		TableName: aws.String(vars.GAME_TABLE_DYNAMODB),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	items := []GameLobbyDDBItem{}
+	items := []GameTableDDBItem{}
 	attributevalue.UnmarshalListOfMaps(out.Items, &items)
 	return items, nil
 }
 
-func (l GameLobbyDDBItem) SyncGame(ctx context.Context) error {
+func (l GameTableDDBItem) SyncGame(ctx context.Context) error {
 	update := expression.Set(expression.Name("Game"), expression.Value(l.Game))
 	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
 
 	_, err := client(ctx).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-		Key:                       GameLobbyDDBItemKey(l.GameLobbyId),
+		TableName:                 aws.String(vars.GAME_TABLE_DYNAMODB),
+		Key:                       GameTableDDBKey(l.GameTableId),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),
@@ -104,7 +103,7 @@ func (l GameLobbyDDBItem) SyncGame(ctx context.Context) error {
 	return err
 }
 
-func (l GameLobbyDDBItem) SyncConnections(ctx context.Context) error {
+func (l GameTableDDBItem) SyncConnections(ctx context.Context) error {
 	update := expression.Set(
 		expression.Name("Connections"),
 		expression.Value(l.Connections),
@@ -118,8 +117,8 @@ func (l GameLobbyDDBItem) SyncConnections(ctx context.Context) error {
 	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
 
 	_, err := client(ctx).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(os.Getenv("GAME_SESSION_DYNAMODB")),
-		Key:                       GameLobbyDDBItemKey(l.GameLobbyId),
+		TableName:                 aws.String(vars.GAME_TABLE_DYNAMODB),
+		Key:                       GameTableDDBKey(l.GameTableId),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),
@@ -128,7 +127,7 @@ func (l GameLobbyDDBItem) SyncConnections(ctx context.Context) error {
 	return err
 }
 
-func (l GameLobbyDDBItem) ProcessGameResult(ctx context.Context, winner int) error {
+func (l GameTableDDBItem) ProcessGameResult(ctx context.Context, winner int) error {
 	win, _ := GetUser(ctx, l.CoinToss[winner])
 	lose, _ := GetUser(ctx, l.CoinToss[(winner+1)%2])
 
@@ -150,7 +149,7 @@ func (l GameLobbyDDBItem) ProcessGameResult(ctx context.Context, winner int) err
 	return nil
 }
 
-func (l GameLobbyDDBItem) StartNewGame() {
+func (l GameTableDDBItem) StartNewGame() {
 	l.Game.StartNewGame()
 	l.CoinToss = l.Players
 	if time.Now().Nanosecond()%2 == 0 {
@@ -158,27 +157,27 @@ func (l GameLobbyDDBItem) StartNewGame() {
 	}
 }
 
-type LobbyBroadcastPayload struct {
+type GameTableBroadcastPayload struct {
 	EventType         string
-	*GameLobbyDDBItem `json:",omitempty"`
+	*GameTableDDBItem `json:",omitempty"`
 	Chat              string `json:",omitempty"`
 }
 
-func (s GameLobbyDDBItem) BroadcastChat(ctx context.Context, chat string) {
-	s.Broadcast(ctx, LobbyBroadcastPayload{
+func (s GameTableDDBItem) BroadcastChat(ctx context.Context, chat string) {
+	s.Broadcast(ctx, GameTableBroadcastPayload{
 		EventType: vars.CHATEVENT,
 		Chat:      chat,
 	})
 }
 
-func (s GameLobbyDDBItem) BroadcastGame(ctx context.Context) {
-	s.Broadcast(ctx, LobbyBroadcastPayload{
+func (s GameTableDDBItem) BroadcastGame(ctx context.Context) {
+	s.Broadcast(ctx, GameTableBroadcastPayload{
 		EventType:        vars.GAMEEVENT,
-		GameLobbyDDBItem: &s,
+		GameTableDDBItem: &s,
 	})
 }
 
-func (s GameLobbyDDBItem) Broadcast(ctx context.Context, payload LobbyBroadcastPayload) {
+func (s GameTableDDBItem) Broadcast(ctx context.Context, payload GameTableBroadcastPayload) {
 	for _, c := range s.Connections {
 		err := awsutils.SendWebsocketMessage(ctx, c.ConnectionId, payload)
 		if err != nil {

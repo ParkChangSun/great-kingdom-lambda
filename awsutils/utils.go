@@ -3,7 +3,7 @@ package awsutils
 import (
 	"context"
 	"encoding/json"
-	"os"
+	"sam-app/vars"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -26,7 +26,7 @@ func SendToQueue(ctx context.Context, record interface{}, groupId string) error 
 	body, _ := json.Marshal(record)
 
 	_, err := sqsClient(ctx).SendMessage(ctx, &sqs.SendMessageInput{
-		QueueUrl:       aws.String(os.Getenv("POST_MESSAGE_QUEUE")),
+		QueueUrl:       aws.String(vars.WEBSOCKET_EVENT_QUEUE),
 		MessageBody:    aws.String(string(body)),
 		MessageGroupId: aws.String(groupId),
 	})
@@ -40,14 +40,14 @@ func wsClient(ctx context.Context) *apigatewaymanagementapi.Client {
 	if _wsClient == nil {
 		cfg, _ := config.LoadDefaultConfig(ctx)
 		_wsClient = apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
-			o.BaseEndpoint = aws.String(os.Getenv("WEBSOCKET_ENDPOINT"))
+			o.BaseEndpoint = aws.String(vars.WEBSOCKET_ENDPOINT)
 		})
 	}
 	return _wsClient
 
 }
 
-func SendWebsocketMessage(ctx context.Context, connectionId string, payload interface{}) error {
+func SendWebsocketMessage(ctx context.Context, connectionId string, payload any) error {
 	data, _ := json.Marshal(payload)
 	_, err := wsClient(ctx).PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
 		ConnectionId: aws.String(connectionId),
@@ -62,4 +62,8 @@ func RESTResponse(statusCode int, headers map[string]string, body string) events
 		Headers:    headers,
 		Body:       body,
 	}
+}
+
+type RESTErrorMessage struct {
+	Message string `json:"message"`
 }

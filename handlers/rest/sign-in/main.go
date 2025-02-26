@@ -13,20 +13,17 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	reqBody := struct {
-		Id       string
-		Password string
-	}{}
+	reqBody := auth.Authenticate{}
 	json.Unmarshal([]byte(req.Body), &reqBody)
 
-	userItem, err := ddb.GetUser(ctx, reqBody.Id)
+	user, err := ddb.GetUser(ctx, reqBody.Id)
 	if err != nil {
-		return awsutils.RESTResponse(400, auth.CORSHeaders, "user not found"), nil
+		return awsutils.RESTResponse(400, auth.CORSHeaders, "login failed"), nil
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(userItem.PasswordHash), []byte(reqBody.Password))
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(reqBody.Password))
 	if err != nil {
-		return awsutils.RESTResponse(400, auth.CORSHeaders, "password incorrect"), nil
+		return awsutils.RESTResponse(400, auth.CORSHeaders, "login failed"), nil
 	}
 
 	a, r, err := auth.GenerateTokenSet(reqBody.Id)
@@ -34,14 +31,14 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	userItem.RefreshToken = r
-	err = userItem.SyncRefreshToken(ctx)
+	user.RefreshToken = r
+	err = user.SyncRefreshToken(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	resBody, _ := json.Marshal(struct{ Id string }{Id: userItem.UserId})
-	return awsutils.RESTResponse(200, auth.AuthHeaders(a, r), string(resBody)), nil
+	resBody, _ := json.Marshal(auth.AuthBody{Authorized: true, AccessToken: a, Id: user.UserId})
+	return awsutils.RESTResponse(200, auth.AuthHeaders(r), string(resBody)), nil
 }
 
 func main() {

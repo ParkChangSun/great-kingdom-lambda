@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"os"
+	"encoding/json"
 	"sam-app/auth"
+	"sam-app/awsutils"
 	"sam-app/ddb"
-	"time"
+	"sam-app/vars"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -23,14 +24,12 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: 200,
-		Headers: map[string]string{
-			"Access-Control-Allow-Credentials": "true",
-			"Access-Control-Allow-Origin":      os.Getenv("WEB_CLIENT_ORIGIN"),
-			"Set-Cookie":                       auth.CookieHeader("GreatKingdomRefresh", "", time.Now().Add(auth.EXPIRED)),
-		},
-	}, nil
+	resBody, _ := json.Marshal(auth.AuthBody{Authorized: false, AccessToken: "", Id: ""})
+	return awsutils.RESTResponse(200, map[string]string{
+		"Access-Control-Allow-Credentials": "true",
+		"Access-Control-Allow-Origin":      vars.WEB_CLIENT_ORIGIN,
+		"Set-Cookie":                       auth.ExpiredCookie,
+	}, string(resBody)), nil
 }
 
 func main() {

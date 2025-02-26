@@ -15,10 +15,7 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	body := struct {
-		Id       string
-		Password string
-	}{}
+	body := auth.Authenticate{}
 	json.Unmarshal([]byte(req.Body), &body)
 
 	_, err := ddb.GetUser(ctx, body.Id)

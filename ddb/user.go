@@ -2,8 +2,8 @@ package ddb
 
 import (
 	"context"
-	"os"
 	"sam-app/game"
+	"sam-app/vars"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -13,16 +13,16 @@ import (
 )
 
 type ConnectionDDBItem struct {
-	UserId        string
-	ConnectionId  string
-	GameSessionId string
+	UserId       string
+	ConnectionId string
+	GameTableId  string
 }
 
 func PutConnInPool(ctx context.Context, conn ConnectionDDBItem) error {
 	item, _ := attributevalue.MarshalMap(conn)
 
 	_, err := client(ctx).PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
+		TableName: aws.String(vars.CONNECTION_DYNAMODB),
 		Item:      item,
 	})
 
@@ -33,7 +33,7 @@ func DeleteConnInPool(ctx context.Context, connId string) (ConnectionDDBItem, er
 	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{connId})
 
 	out, err := client(ctx).DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName:    aws.String(os.Getenv("CONNECTION_DYNAMODB")),
+		TableName:    aws.String(vars.CONNECTION_DYNAMODB),
 		Key:          key,
 		ReturnValues: "ALL_OLD",
 	})
@@ -49,7 +49,7 @@ func DeleteConnInPool(ctx context.Context, connId string) (ConnectionDDBItem, er
 func GetConnection(ctx context.Context, connectionId string) (ConnectionDDBItem, error) {
 	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{connectionId})
 	query, err := client(ctx).GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(os.Getenv("CONNECTION_DYNAMODB")),
+		TableName: aws.String(vars.CONNECTION_DYNAMODB),
 		Key:       key,
 	})
 	if err != nil {
@@ -99,7 +99,7 @@ func PutUser(ctx context.Context, id, pwh string) error {
 		RecentGames:  []RecentGame{},
 	})
 	_, err := client(ctx).PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(os.Getenv("USER_DYNAMODB")),
+		TableName: aws.String(vars.USER_DYNAMODB),
 		Item:      data,
 	})
 	return err
@@ -107,7 +107,7 @@ func PutUser(ctx context.Context, id, pwh string) error {
 
 func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
 	query, err := client(ctx).GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(os.Getenv("USER_DYNAMODB")),
+		TableName: aws.String(vars.USER_DYNAMODB),
 		Key:       UserDDBItemKey(userId),
 	})
 	if err != nil {
@@ -136,7 +136,7 @@ func (u UserDDBItem) SyncRecord(ctx context.Context) error {
 	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
 
 	_, err := client(ctx).UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(os.Getenv("USER_DYNAMODB")),
+		TableName:                 aws.String(vars.USER_DYNAMODB),
 		Key:                       UserDDBItemKey(u.UserId),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
@@ -153,7 +153,7 @@ func (u UserDDBItem) SyncRefreshToken(ctx context.Context) error {
 	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
 
 	_, err := client(ctx).UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(os.Getenv("USER_DYNAMODB")),
+		TableName:                 aws.String(vars.USER_DYNAMODB),
 		Key:                       UserDDBItemKey(u.UserId),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
