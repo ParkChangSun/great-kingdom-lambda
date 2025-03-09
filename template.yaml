@@ -24,9 +24,6 @@ Resources:
       BuildMethod: go1.x
     Properties:
       CodeUri: handlers/authorizer/
-      Environment:
-        Variables:
-          ALLOWED_RESOURCES_PREFIX: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}
 
   RestApi:
     Type: AWS::Serverless::Api
@@ -200,22 +197,22 @@ Resources:
       StageName: Dev
       AutoDeploy: true
 
-  WebSocketApiAuthorizer:
-    Type: AWS::ApiGatewayV2::Authorizer
-    Properties:
-      Name: LambdaAuthorizer
-      ApiId: !Ref WebSocketApi
-      AuthorizerType: REQUEST
-      AuthorizerUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
-      IdentitySource: 
-        - route.request.header.Authorization
+  # WebSocketApiAuthorizer:
+  #   Type: AWS::ApiGatewayV2::Authorizer
+  #   Properties:
+  #     Name: LambdaAuthorizer
+  #     ApiId: !Ref WebSocketApi
+  #     AuthorizerType: REQUEST
+  #     AuthorizerUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
+  #     IdentitySource: 
+  #       - route.request.header.Authorization
 
-  WebSocketAuthorizerPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref AuthorizerFunction
-      Principal: apigateway.amazonaws.com
+  # WebSocketAuthorizerPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref AuthorizerFunction
+  #     Principal: apigateway.amazonaws.com
 
   WebSocketConnectRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -223,8 +220,8 @@ Resources:
       ApiId: !Ref WebSocketApi
       RouteKey: $connect
       Target: !Sub 'integrations/${WebSocketConnectIntegration}'
-      AuthorizationType: CUSTOM
-      AuthorizerId: !Ref WebSocketApiAuthorizer
+      # AuthorizationType: CUSTOM
+      # AuthorizerId: !Ref WebSocketApiAuthorizer
 
   WebSocketConnectIntegration:
     Type: AWS::ApiGatewayV2::Integration
@@ -284,6 +281,40 @@ Resources:
       FunctionName: !Ref WebSocketDisconnectFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$disconnect'
+
+  WebSocketAuthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: auth
+      Target: !Sub 'integrations/${WebSocketAuthIntegration}'
+
+  WebSocketAuthIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketAuthFunction.Arn}/invocations'
+
+  WebSocketAuthFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: handlers/ws/auth/
+      Policies:
+        - AmazonSQSFullAccess
+        - AmazonAPIGatewayInvokeFullAccess
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref WebSocketConnectionDynamoDB
+
+  WebSocketAuthPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WebSocketAuthFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/auth'
 
   WebSocketMoveRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -375,12 +406,6 @@ Resources:
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
         - AmazonAPIGatewayInvokeFullAccess
-        # - Statement:
-        #     - Effect: Allow
-        #       Action:
-        #         - "execute-api:ManageConnections"
-        #       Resource:
-        #         - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
 
   WebSocketGlobalChatPermission:
     Type: AWS::Lambda::Permission
@@ -414,12 +439,6 @@ Resources:
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
         - AmazonAPIGatewayInvokeFullAccess
-        # - Statement:
-        #     - Effect: Allow
-        #       Action:
-        #         - "execute-api:ManageConnections"
-        #       Resource:
-        #         - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
 
   WebSocketPingPermission:
     Type: AWS::Lambda::Permission
@@ -454,12 +473,6 @@ Resources:
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
         - AmazonAPIGatewayInvokeFullAccess
-        # - Statement:
-        #     - Effect: Allow
-        #       Action:
-        #         - "execute-api:ManageConnections"
-        #       Resource:
-        #         - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
 
   WebSocketSlotPermission:
     Type: AWS::Lambda::Permission
@@ -500,12 +513,6 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref UserDynamoDB
         - AmazonAPIGatewayInvokeFullAccess
-        # - Statement:
-        #     - Effect: Allow
-        #       Action:
-        #         - "execute-api:ManageConnections"
-        #       Resource:
-        #         - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*"
       Events:
         WebSocketEventSQS:
           Type: SQS
@@ -519,7 +526,7 @@ Resources:
       AttributeDefinitions:
         - AttributeName: ConnectionId
           AttributeType: "S"
-        - AttributeName: GameSessionId
+        - AttributeName: GameTableId
           AttributeType: S
       KeySchema:
         - AttributeName: ConnectionId
@@ -527,7 +534,7 @@ Resources:
       GlobalSecondaryIndexes:
         - IndexName: globalchat
           KeySchema:
-            - AttributeName: GameSessionId
+            - AttributeName: GameTableId
               KeyType: HASH
             - AttributeName: ConnectionId
               KeyType: RANGE

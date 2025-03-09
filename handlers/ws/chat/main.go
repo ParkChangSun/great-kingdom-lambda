@@ -24,7 +24,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	}
 
 	r := ddb.Record{
-		EventType:         vars.CHATEVENT,
+		EventType:         vars.TABLECHATEVENT,
 		ConnectionDDBItem: conn,
 		Chat:              chat.Chat,
 		Timestamp:         req.RequestContext.RequestTimeEpoch,

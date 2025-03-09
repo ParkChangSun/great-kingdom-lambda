@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func generatePolicy(principalID, effect, resource string, context map[string]interface{}) events.APIGatewayCustomAuthorizerResponse {
+func generatePolicy(principalID, effect, resource string, context map[string]any) events.APIGatewayCustomAuthorizerResponse {
 	return events.APIGatewayCustomAuthorizerResponse{
 		PrincipalID: principalID,
 		PolicyDocument: events.APIGatewayCustomAuthorizerPolicy{
@@ -26,21 +27,17 @@ func generatePolicy(principalID, effect, resource string, context map[string]int
 }
 
 func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTypeRequest) (events.APIGatewayCustomAuthorizerResponse, error) {
-	// resource := fmt.Sprintf("%s:%s/%s/*", os.Getenv("ALLOWED_RESOURCES_PREFIX"), req.RequestContext.APIID, req.RequestContext.Stage)
+	resource := fmt.Sprintf("arn:aws:execute-api:*:%s:%s/*", req.RequestContext.AccountID, req.RequestContext.APIID)
 
-	authorization := req.Headers["Authorization"]
 	accessTokenClaims := jwt.RegisteredClaims{}
-	accessToken, err := jwt.ParseWithClaims(authorization, &accessTokenClaims, func(t *jwt.Token) (any, error) {
+	_, err := jwt.ParseWithClaims(req.Headers["Authorization"], &accessTokenClaims, func(t *jwt.Token) (any, error) {
 		return []byte("key"), nil
 	})
 	if err != nil {
-		return generatePolicy(accessTokenClaims.Subject, "Deny", req.MethodArn, nil), nil
+		return generatePolicy(accessTokenClaims.Subject, "Deny", resource, nil), nil
 	}
 
-	if accessToken.Valid {
-		return generatePolicy(accessTokenClaims.Subject, "Allow", req.MethodArn, map[string]any{"UserId": accessTokenClaims.Subject}), nil
-	}
-	return generatePolicy(accessTokenClaims.Subject, "Deny", req.MethodArn, nil), nil
+	return generatePolicy(accessTokenClaims.Subject, "Allow", resource, map[string]any{"UserId": accessTokenClaims.Subject}), nil
 }
 
 func main() {

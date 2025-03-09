@@ -31,7 +31,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	key := expression.KeyEqual(expression.Key("GameSessionId"), expression.Value("globalchat"))
+	key := expression.KeyEqual(expression.Key("GameTableId"), expression.Value("globalchat"))
 	expr, _ := expression.NewBuilder().WithKeyCondition(key).Build()
 	out, err := dynamodb.NewFromConfig(cfg).Query(ctx, &dynamodb.QueryInput{
 		TableName:                 aws.String(vars.CONNECTION_DYNAMODB),

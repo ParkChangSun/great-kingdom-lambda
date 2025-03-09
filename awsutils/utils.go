@@ -22,7 +22,7 @@ func sqsClient(ctx context.Context) *sqs.Client {
 	return _sqsClient
 }
 
-func SendToQueue(ctx context.Context, record interface{}, groupId string) error {
+func SendToQueue(ctx context.Context, record any, groupId string) error {
 	body, _ := json.Marshal(record)
 
 	_, err := sqsClient(ctx).SendMessage(ctx, &sqs.SendMessageInput{
@@ -52,6 +52,13 @@ func SendWebsocketMessage(ctx context.Context, connectionId string, payload any)
 	_, err := wsClient(ctx).PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
 		ConnectionId: aws.String(connectionId),
 		Data:         data,
+	})
+	return err
+}
+
+func DeleteWebSocket(ctx context.Context, connectionId string) error {
+	_, err := wsClient(ctx).DeleteConnection(ctx, &apigatewaymanagementapi.DeleteConnectionInput{
+		ConnectionId: aws.String(connectionId),
 	})
 	return err
 }

@@ -21,7 +21,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	}
 
 	r := ddb.Record{
-		EventType:         vars.LEAVEEVENT,
+		EventType:         vars.TABLELEAVEEVENT,
 		ConnectionDDBItem: conn,
 		Timestamp:         req.RequestContext.RequestTimeEpoch,
 	}

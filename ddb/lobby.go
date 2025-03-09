@@ -149,7 +149,7 @@ func (l GameTableDDBItem) ProcessGameResult(ctx context.Context, winner int) err
 	return nil
 }
 
-func (l GameTableDDBItem) StartNewGame() {
+func (l *GameTableDDBItem) StartNewGame() {
 	l.Game.StartNewGame()
 	l.CoinToss = l.Players
 	if time.Now().Nanosecond()%2 == 0 {
@@ -161,18 +161,19 @@ type GameTableBroadcastPayload struct {
 	EventType         string
 	*GameTableDDBItem `json:",omitempty"`
 	Chat              string `json:",omitempty"`
+	Auth              bool
 }
 
 func (s GameTableDDBItem) BroadcastChat(ctx context.Context, chat string) {
 	s.Broadcast(ctx, GameTableBroadcastPayload{
-		EventType: vars.CHATEVENT,
+		EventType: vars.CHATBROADCAST,
 		Chat:      chat,
 	})
 }
 
 func (s GameTableDDBItem) BroadcastGame(ctx context.Context) {
 	s.Broadcast(ctx, GameTableBroadcastPayload{
-		EventType:        vars.GAMEEVENT,
+		EventType:        vars.TABLEBROADCAST,
 		GameTableDDBItem: &s,
 	})
 }

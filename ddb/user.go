@@ -13,8 +13,8 @@ import (
 )
 
 type ConnectionDDBItem struct {
-	UserId       string
 	ConnectionId string
+	UserId       string
 	GameTableId  string
 }
 
@@ -64,8 +64,25 @@ func GetConnection(ctx context.Context, connectionId string) (ConnectionDDBItem,
 	return record, nil
 }
 
+func (c ConnectionDDBItem) UpdateUserId(ctx context.Context) error {
+	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{c.ConnectionId})
+	update := expression.Set(
+		expression.Name("UserId"),
+		expression.Value(c.UserId),
+	)
+	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
+	_, err := client(ctx).UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(vars.CONNECTION_DYNAMODB),
+		Key:                       key,
+		UpdateExpression:          expr.Update(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+	})
+	return err
+}
+
 type Record struct {
-	EventType string
+	EventType vars.TABLEEVENTTYPE
 	ConnectionDDBItem
 
 	Chat string

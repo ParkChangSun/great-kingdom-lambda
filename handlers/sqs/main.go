@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sam-app/awsutils"
 	"sam-app/ddb"
 	"sam-app/vars"
 	"slices"
@@ -15,9 +16,10 @@ import (
 )
 
 func joinEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) error {
-	err := ddb.PutConnInPool(ctx, record.ConnectionDDBItem)
-	if err != nil {
-		return err
+	if slices.ContainsFunc(l.Connections, func(c ddb.ConnectionDDBItem) bool { return c.UserId == record.UserId }) {
+		log.Print("dup conn detected")
+		awsutils.DeleteWebSocket(ctx, record.ConnectionId)
+		return nil
 	}
 
 	l.Connections = append(l.Connections, record.ConnectionDDBItem)
@@ -25,7 +27,7 @@ func joinEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) e
 		l.Players = append(l.Players, record.UserId)
 	}
 
-	err = l.SyncConnections(ctx)
+	err := l.SyncConnections(ctx)
 	if err != nil {
 		return err
 	}
@@ -37,12 +39,12 @@ func joinEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) e
 }
 
 func leaveEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) error {
-	l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == record.UserId })
 	l.Connections = slices.DeleteFunc(l.Connections, func(u ddb.ConnectionDDBItem) bool { return u.UserId == record.UserId })
 	if len(l.Connections) == 0 {
 		return ddb.DeleteGameTable(ctx, l.GameTableId)
 	}
 
+	l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == record.UserId })
 	if l.Game.Playing && len(l.Players) < 2 {
 		l.ProcessGameResult(ctx, slices.IndexFunc(l.CoinToss, func(u string) bool { return u == l.Players[0] }))
 		l.BroadcastChat(ctx, fmt.Sprint(l.Players[0], " won."))
@@ -119,22 +121,21 @@ func gameEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) e
 		return nil
 	}
 
-	if record.Move.Pass && l.Game.Pass() {
-		b, o, w := l.Game.CountTerritory()
-		l.ProcessGameResult(ctx, w)
-		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", b, " : ", o, "(+3)", " ", l.CoinToss[0], " won."))
+	if record.Move.Pass {
+		l.Game.Pass()
+	} else if l.Game.CellPlayable(record.Move.Point) {
+		l.Game.Move(record.Move.Point)
 	} else {
-		finished, sieged, err := l.Game.Move(record.Move.Point)
-		if err != nil {
-			return err
-		}
+		return nil
+	}
+
+	if !l.Game.Playing {
+		b, o, sieged, w := l.Game.CountTerritory()
+		l.ProcessGameResult(ctx, w)
 		if sieged {
-			l.ProcessGameResult(ctx, (l.Game.Turn-1)%2)
-			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.CoinToss[(l.Game.Turn-1)%2], " won."))
-		} else if finished {
-			b, o, w := l.Game.CountTerritory()
-			l.ProcessGameResult(ctx, w)
-			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", b, " : ", o, "(+3)", " ", l.CoinToss[0], " won."))
+			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.CoinToss[w], " sieged its opponent."))
+		} else {
+			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", b, " : ", o, "(+3)", " ", l.CoinToss[w], " won."))
 		}
 	}
 
@@ -150,10 +151,11 @@ func gameEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) e
 
 func handler(ctx context.Context, req events.SQSEvent) {
 	for _, record := range req.Records {
-		var err error
-
 		r := ddb.Record{}
 		json.Unmarshal([]byte(record.Body), &r)
+		if r.UserId == "" {
+			continue
+		}
 
 		l, err := ddb.GetGameTable(ctx, r.GameTableId)
 		if err != nil {
@@ -162,19 +164,19 @@ func handler(ctx context.Context, req events.SQSEvent) {
 		}
 
 		switch r.EventType {
-		case vars.JOINEVENT:
+		case vars.TABLEJOINEVENT:
 			err = joinEvent(ctx, r, l)
 
-		case vars.LEAVEEVENT:
+		case vars.TABLELEAVEEVENT:
 			err = leaveEvent(ctx, r, l)
 
-		case vars.GAMEEVENT:
+		case vars.TABLEMOVEEVENT:
 			err = gameEvent(ctx, r, l)
 
-		case vars.SLOTEVENT:
+		case vars.TABLESLOTEVENT:
 			err = slotEvent(ctx, r, l)
 
-		case vars.CHATEVENT:
+		case vars.TABLECHATEVENT:
 			err = chatEvent(ctx, r, l)
 		}
 

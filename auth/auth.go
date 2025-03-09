@@ -10,7 +10,7 @@ import (
 
 const (
 	ACCESSEXPIRES  = time.Minute * 5
-	REFRESHEXPIRES = time.Minute * 15
+	REFRESHEXPIRES = time.Hour
 	EXPIRED        = time.Hour * -1
 )
 
@@ -62,7 +62,7 @@ func GenerateTokenSet(userId string) (string, string, error) {
 	}
 	refresh := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Subject:   userId,
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(ACCESSEXPIRES)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(REFRESHEXPIRES)),
 	})
 	signedRefresh, err := refresh.SignedString([]byte("key"))
 	if err != nil {
