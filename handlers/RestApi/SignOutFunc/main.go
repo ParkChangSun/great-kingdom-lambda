@@ -27,7 +27,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	resBody, _ := json.Marshal(auth.AuthBody{Authorized: false, AccessToken: "", Id: ""})
 	return awsutils.RESTResponse(200, map[string]string{
 		"Access-Control-Allow-Credentials": "true",
-		"Access-Control-Allow-Origin":      vars.WEB_CLIENT_ORIGIN,
+		"Access-Control-Allow-Origin":      vars.CLIENT_ORIGIN,
 		"Set-Cookie":                       auth.ExpiredCookie,
 	}, string(resBody)), nil
 }

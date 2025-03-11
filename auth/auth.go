@@ -25,7 +25,7 @@ type AuthBody struct {
 
 var CORSHeaders = map[string]string{
 	"Access-Control-Allow-Credentials": "true",
-	"Access-Control-Allow-Origin":      vars.WEB_CLIENT_ORIGIN,
+	"Access-Control-Allow-Origin":      vars.CLIENT_ORIGIN,
 }
 
 var ExpiredCookie = CookieHeader("GreatKingdomRefresh", "", time.Now().Add(EXPIRED))
@@ -33,7 +33,7 @@ var ExpiredCookie = CookieHeader("GreatKingdomRefresh", "", time.Now().Add(EXPIR
 func AuthHeaders(r string) map[string]string {
 	return map[string]string{
 		"Access-Control-Allow-Credentials": "true",
-		"Access-Control-Allow-Origin":      vars.WEB_CLIENT_ORIGIN,
+		"Access-Control-Allow-Origin":      vars.CLIENT_ORIGIN,
 		"Set-Cookie":                       CookieHeader("GreatKingdomRefresh", r, time.Now().Add(REFRESHEXPIRES)),
 	}
 }

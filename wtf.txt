@@ -1,11 +1,7 @@
-
-
-
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMDYwN30.aMakOT0BAtR62gRFDR9E5qQMvM28YwWpwDNHDLJ1zDA access
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMzkwN30.6Mcd5pxtA_mA3DrxRiZJfVppU_c0UbCagRmr6E6kwK4 cookie
 
 지금
-게임 로직 게임종료관련 리팩토링
 prod dev 분리
 
 
@@ -14,19 +10,25 @@ prod dev 분리
 
 
 기능 먼저
+main 태그 seo
 
 
 부가적인 것
 언어 설정
-글로벌챗 분리후 다시만들기 게임시작 분리
+글로벌챗 분리후 다시만들기 게임시작 분리/게임은 걍 합칠까 3=>1
+table tables 합치기 
 방목록은 unauth 입장은 auth로 하면 어떨까 웹소켓 auth
+이름 cell로 바꾸기 game
+awsutils=>lib 에 ddb 넣기
+
 
 
 나아중에해볼거
 그냥 펑션 폴리시 롤로 줘도 될거같은데
-main 태그 seo
 cloudformation 계층화
-arm64 httpapi
+arm64 / httpapi
+ domainname apimapping / s3 / route53?
+ keep-alive?
 
 
 안해도되는거

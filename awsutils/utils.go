@@ -26,7 +26,7 @@ func SendToQueue(ctx context.Context, record any, groupId string) error {
 	body, _ := json.Marshal(record)
 
 	_, err := sqsClient(ctx).SendMessage(ctx, &sqs.SendMessageInput{
-		QueueUrl:       aws.String(vars.WEBSOCKET_EVENT_QUEUE),
+		QueueUrl:       aws.String(vars.GAME_TABLE_EVENT_QUEUE),
 		MessageBody:    aws.String(string(body)),
 		MessageGroupId: aws.String(groupId),
 	})

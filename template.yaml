@@ -2,39 +2,46 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Great Kingdom Serverless Backend
 
+# Parameters:
+#   Environment:
+#     Type: String
+#     AllowedValues:
+#       - dev
+#       - prod
+#     Default: dev
+
 Globals:
   Function:
     Timeout: 5
     MemorySize: 128
     Runtime: provided.al2023
     Handler: bootstrap
+    CodeUri: .
     Environment:
       Variables:
         GAME_TABLE_DYNAMODB: !Ref GameTableDynamoDB
         USER_DYNAMODB: !Ref UserDynamoDB
         CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
-        WEBSOCKET_EVENT_QUEUE: !Ref WebSocketEventQueue
-        WEB_CLIENT_ORIGIN: https://www.greatkingdom.net
-        WEBSOCKET_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketDevStage}"
+        GAME_TABLE_EVENT_QUEUE: !Ref GameTableEventQueue
+        CLIENT_ORIGIN: https://www.greatkingdom.net
+        # WEBSOCKET_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketApiDevStage}"
 
 Resources:
-  AuthorizerFunction:
+  RestAuthorizerFunc:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/authorizer/
+      BuildMethod: makefile
 
   RestApi:
     Type: AWS::Serverless::Api
     Properties:
       Name: great-kingdom-rest
-      StageName: Prod
+      StageName: prod
       AlwaysDeploy: true
       Auth:
         Authorizers:
           LambdaAuthorizer:
-            FunctionArn: !GetAtt AuthorizerFunction.Arn
+            FunctionArn: !GetAtt RestAuthorizerFunc.Arn
             FunctionPayloadType: REQUEST
             Identity:
               Headers:
@@ -55,13 +62,27 @@ Resources:
         AllowHeaders: "'Content-Type,Authorization'"
         AllowOrigin: "'https://www.greatkingdom.net'"
         AllowCredentials: true
+
+  # RestApiDomainName:
+  #   Type: AWS::ApiGatewayV2::DomainName
+  #   Properties:
+  #     DomainName: api.greatkingdom.net
+  #     DomainNameConfigurations:
+  #       - EndpointType: REGIONAL
+  #         CertificateName: greatkingdom.net
+
+  # MyApiMapping:
+  #   Type: AWS::ApiGatewayV2::ApiMapping
+  #   Properties:
+  #     DomainName: api.greatkingdom.net
+  #     ApiId: !Ref RestApi
+  #     Stage: prod
         
-  RestCreateGameTableFunction:
+  CreateGameTableFunc:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: go1.x
+      BuildMethod: makefile
     Properties:
-      CodeUri: handlers/rest/create-table/
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref GameTableDynamoDB
@@ -75,12 +96,11 @@ Resources:
             Auth:
               Authorizer: LambdaAuthorizer
 
-  RestGetGameTablesFunction:
+  GetGameTablesFunc:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: go1.x
+      BuildMethod: makefile
     Properties:
-      CodeUri: handlers/rest/get-tables/
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref GameTableDynamoDB
@@ -94,12 +114,11 @@ Resources:
             Auth:
               Authorizer: LambdaAuthorizer
 
-  RestGetUserFunction:
+  GetUserFunc:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: go1.x
+      BuildMethod: makefile
     Properties:
-      CodeUri: handlers/rest/get-user/
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
@@ -113,12 +132,11 @@ Resources:
             Auth:
               Authorizer: LambdaAuthorizer
 
-  RestSignUpFunction:
+  SignUpFunc:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: go1.x
+      BuildMethod: makefile
     Properties:
-      CodeUri: handlers/rest/sign-up/
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
@@ -130,12 +148,11 @@ Resources:
             Path: /sign-up
             Method: POST
 
-  RestSignOutFunction:
+  SignOutFunc:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: go1.x
+      BuildMethod: makefile
     Properties:
-      CodeUri: handlers/rest/sign-out/
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
@@ -149,12 +166,11 @@ Resources:
             Auth:
               Authorizer: LambdaAuthorizer
 
-  RestSignInFunction:
+  SignInFunc:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: go1.x
+      BuildMethod: makefile
     Properties:
-      CodeUri: handlers/rest/sign-in/
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
@@ -166,12 +182,11 @@ Resources:
             Path: /sign-in
             Method: POST
 
-  RestRotateTokenFunction:
+  RotateTokenFunc:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: go1.x
+      BuildMethod: makefile
     Properties:
-      CodeUri: handlers/rest/rotate-token/
       Policies:
         - DynamoDBCrudPolicy: 
             TableName: !Ref UserDynamoDB
@@ -190,302 +205,290 @@ Resources:
       ProtocolType: WEBSOCKET
       RouteSelectionExpression: "$request.body.action"
 
-  WebSocketDevStage:
-    Type: AWS::ApiGatewayV2::Stage
-    Properties:
-      ApiId: !Ref WebSocketApi
-      StageName: Dev
-      AutoDeploy: true
-
-  # WebSocketApiAuthorizer:
-  #   Type: AWS::ApiGatewayV2::Authorizer
+  # WebSocketApiDevStage:
+  #   Type: AWS::ApiGatewayV2::Stage
   #   Properties:
-  #     Name: LambdaAuthorizer
   #     ApiId: !Ref WebSocketApi
-  #     AuthorizerType: REQUEST
-  #     AuthorizerUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
-  #     IdentitySource: 
-  #       - route.request.header.Authorization
+  #     StageName: Dev
+  #     AutoDeploy: true
 
-  # WebSocketAuthorizerPermission:
+  # WebSocketApiDomainName:
+  #   Type: AWS::ApiGatewayV2::DomainName
+  #   Properties:
+  #     DomainName: websocket.greatkingdom.net
+  #     DomainNameConfigurations:
+  #       - EndpointType: REGIONAL
+  #         CertificateName: greatkingdom.net
+
+  # MyApiMapping:
+  #   Type: 'AWS::ApiGatewayV2::ApiMapping'
+  #   Properties:
+  #     DomainName: websocket.greatkingdom.net
+  #     ApiId: !Ref WebSocketApi
+  #     Stage: !Ref WebSocketApiDevStage
+
+  # ConnectRoute:
+  #   Type: AWS::ApiGatewayV2::Route
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     RouteKey: $connect
+  #     Target: !Sub 'integrations/${ConnectIntegration}'
+
+  # ConnectIntegration:
+  #   Type: AWS::ApiGatewayV2::Integration
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     IntegrationType: AWS_PROXY
+  #     IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectFunc.Arn}/invocations'
+
+  # ConnectFunc:
+  #   Type: AWS::Serverless::Function
+  #   Metadata:
+  #     BuildMethod: makefile
+  #   Properties:
+  #     Policies:
+  #       - DynamoDBCrudPolicy:
+  #           TableName: !Ref WebSocketConnectionDynamoDB
+  #       - AmazonSQSFullAccess
+
+  # ConnectPermission:
   #   Type: AWS::Lambda::Permission
   #   Properties:
   #     Action: lambda:InvokeFunction
-  #     FunctionName: !Ref AuthorizerFunction
+  #     FunctionName: !Ref ConnectFunc
   #     Principal: apigateway.amazonaws.com
+  #     SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$connect'
 
-  WebSocketConnectRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketApi
-      RouteKey: $connect
-      Target: !Sub 'integrations/${WebSocketConnectIntegration}'
-      # AuthorizationType: CUSTOM
-      # AuthorizerId: !Ref WebSocketApiAuthorizer
+  # DisconnectRoute:
+  #   Type: AWS::ApiGatewayV2::Route
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     RouteKey: $disconnect
+  #     Target: !Sub 'integrations/${DisconnectIntegration}'
 
-  WebSocketConnectIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketConnectFunction.Arn}/invocations'
+  # DisconnectIntegration:
+  #   Type: AWS::ApiGatewayV2::Integration
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     IntegrationType: AWS_PROXY
+  #     IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectFunc.Arn}/invocations'
 
-  WebSocketConnectFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/ws/connect/
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref WebSocketConnectionDynamoDB
-        - AmazonSQSFullAccess
+  # DisconnectFunc:
+  #   Type: AWS::Serverless::Function
+  #   Metadata:
+  #     BuildMethod: makefile
+  #   Properties:
+  #     Policies:
+  #       - AmazonSQSFullAccess
+  #       - DynamoDBCrudPolicy: 
+  #           TableName: !Ref WebSocketConnectionDynamoDB
 
-  WebSocketConnectPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WebSocketConnectFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$connect'
+  # DisconnectPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref DisconnectFunc
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$disconnect'
 
-  WebSocketDisconnectRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketApi
-      RouteKey: $disconnect
-      Target: !Sub 'integrations/${WebSocketDisconnectIntegration}'
+  # AuthRoute:
+  #   Type: AWS::ApiGatewayV2::Route
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     RouteKey: auth
+  #     Target: !Sub 'integrations/${AuthIntegration}'
 
-  WebSocketDisconnectIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketDisconnectFunction.Arn}/invocations'
+  # AuthIntegration:
+  #   Type: AWS::ApiGatewayV2::Integration
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     IntegrationType: AWS_PROXY
+  #     IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthFunc.Arn}/invocations'
 
-  WebSocketDisconnectFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/ws/disconnect/
-      Policies:
-        - AmazonSQSFullAccess
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref WebSocketConnectionDynamoDB
+  # AuthFunc:
+  #   Type: AWS::Serverless::Function
+  #   Metadata:
+  #     BuildMethod: makefile
+  #   Properties:
+  #     Policies:
+  #       - AmazonSQSFullAccess
+  #       - AmazonAPIGatewayInvokeFullAccess
+  #       - DynamoDBCrudPolicy: 
+  #           TableName: !Ref WebSocketConnectionDynamoDB
 
-  WebSocketDisconnectPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WebSocketDisconnectFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$disconnect'
+  # AuthPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref AuthFunc
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/auth'
 
-  WebSocketAuthRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketApi
-      RouteKey: auth
-      Target: !Sub 'integrations/${WebSocketAuthIntegration}'
+  # MoveRoute:
+  #   Type: AWS::ApiGatewayV2::Route
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     RouteKey: move
+  #     Target: !Sub 'integrations/${MoveIntegration}'
 
-  WebSocketAuthIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketAuthFunction.Arn}/invocations'
+  # MoveIntegration:
+  #   Type: AWS::ApiGatewayV2::Integration
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     IntegrationType: AWS_PROXY
+  #     IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MoveFunc.Arn}/invocations'
 
-  WebSocketAuthFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/ws/auth/
-      Policies:
-        - AmazonSQSFullAccess
-        - AmazonAPIGatewayInvokeFullAccess
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref WebSocketConnectionDynamoDB
+  # MoveFunc:
+  #   Type: AWS::Serverless::Function
+  #   Metadata:
+  #     BuildMethod: makefile
+  #   Properties:
+  #     Policies:
+  #       - AmazonSQSFullAccess
+  #       - DynamoDBCrudPolicy: 
+  #           TableName: !Ref WebSocketConnectionDynamoDB
 
-  WebSocketAuthPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WebSocketAuthFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/auth'
+  # MovePermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref MoveFunc
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/move'
 
-  WebSocketMoveRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketApi
-      RouteKey: move
-      Target: !Sub 'integrations/${WebSocketMoveIntegration}'
+  # ChatRoute:
+  #   Type: AWS::ApiGatewayV2::Route
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     RouteKey: chat
+  #     Target: !Sub 'integrations/${ChatIntegration}'
 
-  WebSocketMoveIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketMoveFunction.Arn}/invocations'
+  # ChatIntegration:
+  #   Type: AWS::ApiGatewayV2::Integration
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     IntegrationType: AWS_PROXY
+  #     IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ChatFunc.Arn}/invocations'
 
-  WebSocketMoveFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/ws/game-move/
-      Policies:
-        - AmazonSQSFullAccess
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref WebSocketConnectionDynamoDB
+  # ChatFunc:
+  #   Type: AWS::Serverless::Function
+  #   Metadata:
+  #     BuildMethod: makefile
+  #   Properties:
+  #     Policies:
+  #       - AmazonSQSFullAccess
+  #       - DynamoDBCrudPolicy: 
+  #           TableName: !Ref WebSocketConnectionDynamoDB
 
-  WebSocketMovePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WebSocketMoveFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/move'
+  # ChatPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref ChatFunc
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/chat'
 
-  WebSocketChatRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketApi
-      RouteKey: chat
-      Target: !Sub 'integrations/${WebSocketChatIntegration}'
+  # GlobalChatRoute:
+  #   Type: AWS::ApiGatewayV2::Route
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     RouteKey: globalchat
+  #     Target: !Sub 'integrations/${GlobalChatIntegration}'
 
-  WebSocketChatIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketChatFunction.Arn}/invocations'
+  # GlobalChatIntegration:
+  #   Type: AWS::ApiGatewayV2::Integration
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     IntegrationType: AWS_PROXY
+  #     IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GlobalChatFunc.Arn}/invocations'
 
-  WebSocketChatFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/ws/chat/
-      Policies:
-        - AmazonSQSFullAccess
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref WebSocketConnectionDynamoDB
+  # GlobalChatFunc:
+  #   Type: AWS::Serverless::Function
+  #   Metadata:
+  #     BuildMethod: makefile
+  #   Properties:
+  #     Policies:
+  #       - DynamoDBCrudPolicy: 
+  #           TableName: !Ref WebSocketConnectionDynamoDB
+  #       - AmazonAPIGatewayInvokeFullAccess
 
-  WebSocketChatPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WebSocketChatFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/chat'
+  # GlobalChatPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref GlobalChatFunc
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/globalchat'
 
-  WebSocketGlobalChatRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketApi
-      RouteKey: globalchat
-      Target: !Sub 'integrations/${WebSocketGlobalChatIntegration}'
+  # PingRoute:
+  #   Type: AWS::ApiGatewayV2::Route
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     RouteKey: ping
+  #     Target: !Sub 'integrations/${PingIntegration}'
 
-  WebSocketGlobalChatIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketGlobalChatFunction.Arn}/invocations'
+  # PingIntegration:
+  #   Type: AWS::ApiGatewayV2::Integration
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     IntegrationType: AWS_PROXY
+  #     IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PingFunc.Arn}/invocations'
 
-  WebSocketGlobalChatFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/ws/global-chat/
-      Policies:
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref WebSocketConnectionDynamoDB
-        - AmazonAPIGatewayInvokeFullAccess
+  # PingFunc:
+  #   Type: AWS::Serverless::Function
+  #   Metadata:
+  #     BuildMethod: makefile
+  #   Properties:
+  #     Policies:
+  #       - DynamoDBCrudPolicy: 
+  #           TableName: !Ref WebSocketConnectionDynamoDB
+  #       - AmazonAPIGatewayInvokeFullAccess
 
-  WebSocketGlobalChatPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WebSocketGlobalChatFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/globalchat'
+  # PingPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref PingFunc
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/ping'
 
-  WebSocketPingRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketApi
-      RouteKey: ping
-      Target: !Sub 'integrations/${WebSocketPingIntegration}'
+  # SlotRoute:
+  #   Type: AWS::ApiGatewayV2::Route
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     RouteKey: slot
+  #     Target: !Sub 'integrations/${SlotIntegration}'
 
-  WebSocketPingIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketPingFunction.Arn}/invocations'
+  # SlotIntegration:
+  #   Type: AWS::ApiGatewayV2::Integration
+  #   Properties:
+  #     ApiId: !Ref WebSocketApi
+  #     IntegrationType: AWS_PROXY
+  #     IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SlotFunc.Arn}/invocations'
 
-  WebSocketPingFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/ws/ping/
-      Policies:
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref WebSocketConnectionDynamoDB
-        - AmazonAPIGatewayInvokeFullAccess
+  # SlotFunc:
+  #   Type: AWS::Serverless::Function
+  #   Metadata:
+  #     BuildMethod: makefile
+  #   Properties:
+  #     Policies:
+  #       - AmazonSQSFullAccess
+  #       - DynamoDBCrudPolicy: 
+  #           TableName: !Ref WebSocketConnectionDynamoDB
+  #       - AmazonAPIGatewayInvokeFullAccess
 
-  WebSocketPingPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WebSocketPingFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/ping'
+  # SlotPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !Ref SlotFunc
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/slot'
 
-  WebSocketSlotRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketApi
-      RouteKey: slot
-      Target: !Sub 'integrations/${WebSocketSlotIntegration}'
-
-  WebSocketSlotIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketSlotFunction.Arn}/invocations'
-
-  WebSocketSlotFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: go1.x
-    Properties:
-      CodeUri: handlers/ws/game-slot/
-      Policies:
-        - AmazonSQSFullAccess
-        - DynamoDBCrudPolicy: 
-            TableName: !Ref WebSocketConnectionDynamoDB
-        - AmazonAPIGatewayInvokeFullAccess
-
-  WebSocketSlotPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WebSocketSlotFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/slot'
-
-  WebSocketEventQueue:
+  GameTableEventQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: WebSocketEventQueue.fifo
+      QueueName: GameTableEventQueue.fifo
       FifoQueue: true
       ContentBasedDeduplication: true
       RedrivePolicy:
@@ -498,12 +501,11 @@ Resources:
       QueueName: DeadLetterQueue.fifo
       FifoQueue: true
 
-  WebSocketEventHandlerFunction:
+  GameTableEventFunc:
     Type: AWS::Serverless::Function
     Metadata:
-      BuildMethod: go1.x
+      BuildMethod: makefile
     Properties:
-      CodeUri: handlers/sqs/
       Policies:
         - AWSLambdaSQSQueueExecutionRole
         - DynamoDBCrudPolicy:
@@ -514,10 +516,10 @@ Resources:
             TableName: !Ref UserDynamoDB
         - AmazonAPIGatewayInvokeFullAccess
       Events:
-        WebSocketEventSQS:
+        GameTableEventQueue:
           Type: SQS
           Properties:
-            Queue: !GetAtt WebSocketEventQueue.Arn
+            Queue: !GetAtt GameTableEventQueue.Arn
 
   WebSocketConnectionDynamoDB:
     Type: AWS::DynamoDB::Table
