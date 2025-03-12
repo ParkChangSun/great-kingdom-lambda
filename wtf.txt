@@ -2,24 +2,21 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMDY
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMzkwN30.6Mcd5pxtA_mA3DrxRiZJfVppU_c0UbCagRmr6E6kwK4 cookie
 
 지금
-prod dev 분리
-
-
-버그
-
-
-
-기능 먼저
 main 태그 seo
+
+
+기능/버그
 
 
 부가적인 것
 언어 설정
-글로벌챗 분리후 다시만들기 게임시작 분리/게임은 걍 합칠까 3=>1
-table tables 합치기 
+글로벌챗 디비 분리
+게임은 걍 합칠까 챗제외
+table tables 라우트 합치기 쿼리스트링유무 구분
 방목록은 unauth 입장은 auth로 하면 어떨까 웹소켓 auth
 이름 cell로 바꾸기 game
 awsutils=>lib 에 ddb 넣기
+jwt사인 키 업로드
 
 
 
@@ -27,16 +24,6 @@ awsutils=>lib 에 ddb 넣기
 그냥 펑션 폴리시 롤로 줘도 될거같은데
 cloudformation 계층화
 arm64 / httpapi
- domainname apimapping / s3 / route53?
- keep-alive?
-
-
-안해도되는거
-유저 삭제
-
-
-
-테스트 목록
-회원가입/로그인/로그아웃/토큰리프레시/타임아웃
-방 생성/새로고침/방 입장/전체채팅
-게임시작/수 놓기/단수/패스/채팅
+s3 / route53?
+keep-alive?
+prod dev 분리
