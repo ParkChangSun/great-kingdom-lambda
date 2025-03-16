@@ -1,4 +1,4 @@
-# Great Kingdom
+# Great Kingdom Online
 
 ```sh
 sam deploy --config-env dev

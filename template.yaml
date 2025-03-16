@@ -10,6 +10,14 @@ Parameters:
       - prod
     Default: dev
 
+  JWTSigningKey:
+    Type: String
+    # NoEcho: true
+
+  DiscordWebhook:
+    Type: String
+    # NoEcho: true
+
 Globals:
   Function:
     Timeout: 5
@@ -25,6 +33,8 @@ Globals:
         GAME_TABLE_EVENT_QUEUE: !Ref GameTableEventQueue
         CLIENT_ORIGIN: https://www.greatkingdom.net
         WEBSOCKET_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketApiProdStage}"
+        JWT_SIGNING_KEY: !Ref JWTSigningKey
+        DISCORD_WEBHOOK: !Ref DiscordWebhook
 
 Resources:
   RestAuthorizerFunc:

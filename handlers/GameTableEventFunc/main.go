@@ -135,7 +135,7 @@ func gameEvent(ctx context.Context, record ddb.Record, l ddb.GameTableDDBItem) e
 		if sieged {
 			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.CoinToss[w], " sieged its opponent."))
 		} else {
-			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", b, " : ", o, "(+3)", " ", l.CoinToss[w], " won."))
+			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", b, " : ", o, "(+2.5)", " ", l.CoinToss[w], " won."))
 		}
 	}
 

@@ -51,12 +51,18 @@ func CookieHeader(name string, value string, expires time.Time) string {
 	return authCookie.String()
 }
 
+func ParseToken(k string) (*jwt.Token, jwt.RegisteredClaims, error) {
+	c := jwt.RegisteredClaims{}
+	t, err := jwt.ParseWithClaims(k, &c, func(t *jwt.Token) (interface{}, error) { return []byte(vars.JWT_SIGNING_KEY), nil })
+	return t, c, err
+}
+
 func GenerateTokenSet(userId string) (string, string, error) {
 	access := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Subject:   userId,
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(ACCESSEXPIRES)),
 	})
-	signedAccess, err := access.SignedString([]byte("key"))
+	signedAccess, err := access.SignedString([]byte(vars.JWT_SIGNING_KEY))
 	if err != nil {
 		return "", "", err
 	}
@@ -64,7 +70,7 @@ func GenerateTokenSet(userId string) (string, string, error) {
 		Subject:   userId,
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(REFRESHEXPIRES)),
 	})
-	signedRefresh, err := refresh.SignedString([]byte("key"))
+	signedRefresh, err := refresh.SignedString([]byte(vars.JWT_SIGNING_KEY))
 	if err != nil {
 		return "", "", err
 	}

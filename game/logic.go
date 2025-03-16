@@ -216,7 +216,7 @@ func (g Game) CountTerritory() (blue int, orange int, sieged bool, winner int) {
 	}
 	if sieged {
 		winner = (g.Turn - 1) % 2
-	} else if blue >= orange+3 {
+	} else if blue > orange+2 {
 		winner = 0
 	} else {
 		winner = 1

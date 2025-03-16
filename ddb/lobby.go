@@ -37,8 +37,8 @@ func PutGameTable(ctx context.Context, tableName string) (string, error) {
 		GameTableId:   id,
 		GameTableName: tableName,
 		Players:       []string{},
-		Connections:   []ConnectionDDBItem{},
 		CoinToss:      []string{},
+		Connections:   []ConnectionDDBItem{},
 	})
 
 	_, err := client(ctx).PutItem(ctx, &dynamodb.PutItemInput{
@@ -151,7 +151,7 @@ func (l GameTableDDBItem) ProcessGameResult(ctx context.Context, winner int) err
 
 func (l *GameTableDDBItem) StartNewGame() {
 	l.Game.StartNewGame()
-	l.CoinToss = l.Players
+	l.CoinToss = slices.Clone(l.Players)
 	if time.Now().Nanosecond()%2 == 0 {
 		slices.Reverse(l.CoinToss)
 	}

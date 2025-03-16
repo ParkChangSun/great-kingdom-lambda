@@ -26,4 +26,10 @@ var (
 	GAME_TABLE_EVENT_QUEUE = os.Getenv("GAME_TABLE_EVENT_QUEUE")
 	CLIENT_ORIGIN          = os.Getenv("CLIENT_ORIGIN")
 	WEBSOCKET_ENDPOINT     = os.Getenv("WEBSOCKET_ENDPOINT")
+	JWT_SIGNING_KEY        = os.Getenv("JWT_SIGNING_KEY")
+	DISCORD_WEBHOOK        = os.Getenv("DISCORD_WEBHOOK")
 )
+
+type ErrorResponseBody struct {
+	Message string `json:"message"`
+}

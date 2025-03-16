@@ -11,9 +11,8 @@ build-GameTableEventFunc:
 	$(MAKE) -C handlers/GameTableEventFunc build
 
 build: 
-	@echo "Building lambda functions..."
-	@sam build
+	@sam build -p
 
-deploy: build
-	@echo "Deploying application..."
-	sam deploy
+clean:
+	@for f in $(DIRS) ; do $(MAKE) -C $$f clean ; done
+	$(MAKE) -C handlers/GameTableEventFun clean

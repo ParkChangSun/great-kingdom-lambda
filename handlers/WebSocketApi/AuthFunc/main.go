@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"sam-app/auth"
 	"sam-app/awsutils"
 	"sam-app/ddb"
 	"sam-app/vars"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -21,16 +21,14 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	accessTokenClaims := jwt.RegisteredClaims{}
-	_, err = jwt.ParseWithClaims(msg.Authorization, &accessTokenClaims, func(t *jwt.Token) (any, error) {
-		return []byte("key"), nil
-	})
+	_, claims, err := auth.ParseToken(msg.Authorization)
 	if err != nil {
 		awsutils.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, ddb.GameTableBroadcastPayload{EventType: vars.AUTHBROADCAST, Auth: false})
+		awsutils.DeleteWebSocket(ctx, req.RequestContext.ConnectionID)
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
-	conn.UserId = accessTokenClaims.Subject
+	conn.UserId = claims.Subject
 	err = conn.UpdateUserId(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err

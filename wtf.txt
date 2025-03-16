@@ -1,29 +1,32 @@
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMDYwN30.aMakOT0BAtR62gRFDR9E5qQMvM28YwWpwDNHDLJ1zDA access
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMzkwN30.6Mcd5pxtA_mA3DrxRiZJfVppU_c0UbCagRmr6E6kwK4 cookie
 
-지금
-main 태그 seo
+todo
+타이머
 
 
-기능/버그
+2차 목표
+기능 소개 홈페이지
 
 
-부가적인 것
-언어 설정
-글로벌챗 디비 분리
-게임은 걍 합칠까 챗제외
-table tables 라우트 합치기 쿼리스트링유무 구분
+
+부가 목표 / 배포 이후
+레이팅
+기보
 방목록은 unauth 입장은 auth로 하면 어떨까 웹소켓 auth
+큐에 게임까지 넣어도 되겠지? 아니면 테이블/게임 디비으로 분리할까 큐에 넣어도 되는 정상이벤트인지 아닌지 판단하고 넣기
+게임은 걍 합칠까 챗제외
+글로벌챗 디비 분리
+테이블 말고 grid div로 게임판늘어나는이슈
+게이트웨이에서 캐싱 cloudfront 캐싱 => 유저 생길 시 중요
+언어 설정
+table tables 라우트 합치기 쿼리스트링유무 구분
 이름 cell로 바꾸기 game
 awsutils=>lib 에 ddb 넣기
-jwt사인 키 업로드
-
-
-
-나아중에해볼거
 그냥 펑션 폴리시 롤로 줘도 될거같은데
 cloudformation 계층화
 arm64 / httpapi
 s3 / route53?
 keep-alive?
 prod dev 분리
+ssm parameter store

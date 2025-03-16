@@ -6,6 +6,7 @@ import (
 	"sam-app/auth"
 	"sam-app/awsutils"
 	"sam-app/ddb"
+	"sam-app/vars"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -18,12 +19,14 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 
 	user, err := ddb.GetUser(ctx, reqBody.Id)
 	if err != nil {
-		return awsutils.RESTResponse(400, auth.CORSHeaders, "login failed"), nil
+		b, _ := json.Marshal(vars.ErrorResponseBody{Message: "login failed"})
+		return awsutils.RESTResponse(400, auth.CORSHeaders, string(b)), nil
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(reqBody.Password))
 	if err != nil {
-		return awsutils.RESTResponse(400, auth.CORSHeaders, "login failed"), nil
+		b, _ := json.Marshal(vars.ErrorResponseBody{Message: "login failed"})
+		return awsutils.RESTResponse(400, auth.CORSHeaders, string(b)), nil
 	}
 
 	a, r, err := auth.GenerateTokenSet(reqBody.Id)

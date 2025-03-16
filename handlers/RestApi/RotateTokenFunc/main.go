@@ -15,17 +15,14 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	cookie := req.Headers["Cookie"]
+	cookie := req.Headers["cookie"]
 	if !strings.Contains(cookie, "GreatKingdomRefresh=") {
 		body, _ := json.Marshal(auth.AuthBody{Authorized: false, AccessToken: "", Id: ""})
 		return awsutils.RESTResponse(400, auth.AuthHeaders(""), string(body)), nil
 	}
 
 	refreshTokenStr, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomRefresh=")+20:], ";")
-	refreshTokenClaims := jwt.RegisteredClaims{}
-	refreshToken, err := jwt.ParseWithClaims(refreshTokenStr, &refreshTokenClaims, func(t *jwt.Token) (any, error) {
-		return []byte("key"), nil
-	})
+	refreshToken, refreshTokenClaims, err := auth.ParseToken(refreshTokenStr)
 
 	if err != nil && !errors.Is(err, jwt.ErrTokenExpired) {
 		return events.APIGatewayProxyResponse{}, err

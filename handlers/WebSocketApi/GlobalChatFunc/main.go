@@ -50,26 +50,9 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	chat := struct {
-		Chat string
-		// ChatName string
-		// Timestamp int64
-	}{
-		Chat: strings.Join([]string{sender.UserId, ":", data.Chat}, " "),
-		// ChatName: "globalchat",
-		// Timestamp: now.UnixMicro(),
-	}
+	c := ddb.GameTableBroadcastPayload{EventType: vars.CHATBROADCAST, Chat: strings.Join([]string{sender.UserId, ":", data.Chat}, " ")}
 
-	// item, _ := attributevalue.MarshalMap(chat)
-	// _, err = dynamodb.NewFromConfig(cfg).PutItem(ctx, &dynamodb.PutItemInput{
-	// 	TableName: aws.String(os.Getenv("GLOBAL_CHAT_DYNAMODB")),
-	// 	Item:      item,
-	// })
-	// if err != nil {
-	// 	return events.APIGatewayProxyResponse{}, err
-	// }
-
-	b, _ := json.Marshal(chat)
+	b, _ := json.Marshal(c)
 	wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
 		o.BaseEndpoint = aws.String(vars.WEBSOCKET_ENDPOINT)
 	})
@@ -82,8 +65,8 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 
 	d, _ := json.Marshal(struct {
 		Content string `json:"content"`
-	}{Content: chat.Chat})
-	r, err := http.Post("https://discordapp.com/api/webhooks/1339283696808759347/KXhIMOAYOt-LRyMWjIP8HLwCvK5V02iOvmvKUEDKgJkQvGHGy1LoErO-gxF280lW5Uwd", "application/json", bytes.NewBuffer(d))
+	}{Content: c.Chat})
+	r, err := http.Post(vars.DISCORD_WEBHOOK, "application/json", bytes.NewBuffer(d))
 	if err != nil {
 		log.Print(err)
 	}
