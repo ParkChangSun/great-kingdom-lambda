@@ -3,18 +3,16 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"sam-app/awsutils"
-	"sam-app/ddb"
-	"sam-app/game"
-	"sam-app/vars"
+	"great-kingdom-lambda/lib/ddb"
+	"great-kingdom-lambda/lib/sqs"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	move := game.Move{}
-	err := json.Unmarshal([]byte(req.Body), &move)
+	e := sqs.GameTableEvent{}
+	err := json.Unmarshal([]byte(req.Body), &e)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
@@ -24,13 +22,12 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	r := ddb.Record{
-		EventType:         vars.TABLEMOVEEVENT,
+	record := sqs.Record{
+		GameTableEvent:    e,
 		ConnectionDDBItem: conn,
-		Move:              move,
 		Timestamp:         req.RequestContext.RequestTimeEpoch,
 	}
-	err = awsutils.SendToQueue(ctx, r, r.GameTableId)
+	err = sqs.SendToQueue(ctx, record, record.GameTableId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

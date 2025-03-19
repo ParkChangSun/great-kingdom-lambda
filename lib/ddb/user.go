@@ -2,8 +2,7 @@ package ddb
 
 import (
 	"context"
-	"sam-app/game"
-	"sam-app/vars"
+	"great-kingdom-lambda/lib/vars"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -79,16 +78,6 @@ func (c ConnectionDDBItem) UpdateUserId(ctx context.Context) error {
 		ExpressionAttributeValues: expr.Values(),
 	})
 	return err
-}
-
-type Record struct {
-	EventType vars.TABLEEVENTTYPE
-	ConnectionDDBItem
-
-	Chat string
-	Move game.Move
-
-	Timestamp int64
 }
 
 type UserDDBItem struct {

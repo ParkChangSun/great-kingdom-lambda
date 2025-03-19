@@ -1,13 +1,15 @@
 package vars
 
-import "os"
+import (
+	"os"
+)
 
 type TABLEEVENTTYPE int
 
 const (
 	TABLEJOINEVENT TABLEEVENTTYPE = iota
 	TABLELEAVEEVENT
-	TABLECHATEVENT
+	TABLESTARTEVENT
 	TABLEMOVEEVENT
 	TABLESLOTEVENT
 )
@@ -29,7 +31,3 @@ var (
 	JWT_SIGNING_KEY        = os.Getenv("JWT_SIGNING_KEY")
 	DISCORD_WEBHOOK        = os.Getenv("DISCORD_WEBHOOK")
 )
-
-type ErrorResponseBody struct {
-	Message string `json:"message"`
-}

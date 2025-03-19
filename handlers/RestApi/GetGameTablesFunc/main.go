@@ -3,9 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"sam-app/auth"
-	"sam-app/awsutils"
-	"sam-app/ddb"
+	"great-kingdom-lambda/lib/auth"
+	"great-kingdom-lambda/lib/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -18,7 +17,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 
 	body, _ := json.Marshal(items)
-	return awsutils.RESTResponse(200, auth.CORSHeaders, string(body)), nil
+	return auth.RESTResponse(200, auth.CORSHeaders, string(body)), nil
 }
 
 func main() {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sam-app/auth"
-	"sam-app/awsutils"
-	"sam-app/ddb"
+	"great-kingdom-lambda/lib/auth"
+	"great-kingdom-lambda/lib/ddb"
+
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -18,7 +18,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	cookie := req.Headers["cookie"]
 	if !strings.Contains(cookie, "GreatKingdomRefresh=") {
 		body, _ := json.Marshal(auth.AuthBody{Authorized: false, AccessToken: "", Id: ""})
-		return awsutils.RESTResponse(400, auth.AuthHeaders(""), string(body)), nil
+		return auth.RESTResponse(400, auth.AuthHeaders(""), string(body)), nil
 	}
 
 	refreshTokenStr, _, _ := strings.Cut(cookie[strings.Index(cookie, "GreatKingdomRefresh=")+20:], ";")
@@ -44,7 +44,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 			return events.APIGatewayProxyResponse{}, err
 		}
 		body, _ := json.Marshal(auth.AuthBody{Authorized: true, AccessToken: a, Id: user.UserId})
-		return awsutils.RESTResponse(200, auth.AuthHeaders(r), string(body)), nil
+		return auth.RESTResponse(200, auth.AuthHeaders(r), string(body)), nil
 	}
 
 	user.RefreshToken = ""
@@ -53,7 +53,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 	body, _ := json.Marshal(auth.AuthBody{Authorized: false, AccessToken: "", Id: ""})
-	return awsutils.RESTResponse(200, auth.AuthHeaders(""), string(body)), nil
+	return auth.RESTResponse(200, auth.AuthHeaders(""), string(body)), nil
 }
 
 func main() {

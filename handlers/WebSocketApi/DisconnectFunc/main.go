@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"sam-app/awsutils"
-	"sam-app/ddb"
-	"sam-app/vars"
+	"great-kingdom-lambda/lib/ddb"
+	"great-kingdom-lambda/lib/sqs"
+	"great-kingdom-lambda/lib/vars"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -20,13 +20,13 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
-	r := ddb.Record{
-		EventType:         vars.TABLELEAVEEVENT,
+	r := sqs.Record{
+		GameTableEvent:    sqs.GameTableEvent{EventType: vars.TABLELEAVEEVENT},
 		ConnectionDDBItem: conn,
 		Timestamp:         req.RequestContext.RequestTimeEpoch,
 	}
 
-	err = awsutils.SendToQueue(ctx, r, r.GameTableId)
+	err = sqs.SendToQueue(ctx, r, r.GameTableId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

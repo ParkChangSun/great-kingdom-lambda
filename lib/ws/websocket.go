@@ -1,38 +1,14 @@
-package awsutils
+package ws
 
 import (
 	"context"
 	"encoding/json"
-	"sam-app/vars"
+	"great-kingdom-lambda/lib/vars"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
-
-var _sqsClient *sqs.Client
-
-func sqsClient(ctx context.Context) *sqs.Client {
-	if _sqsClient == nil {
-		cfg, _ := config.LoadDefaultConfig(ctx)
-		_sqsClient = sqs.NewFromConfig(cfg)
-	}
-	return _sqsClient
-}
-
-func SendToQueue(ctx context.Context, record any, groupId string) error {
-	body, _ := json.Marshal(record)
-
-	_, err := sqsClient(ctx).SendMessage(ctx, &sqs.SendMessageInput{
-		QueueUrl:       aws.String(vars.GAME_TABLE_EVENT_QUEUE),
-		MessageBody:    aws.String(string(body)),
-		MessageGroupId: aws.String(groupId),
-	})
-
-	return err
-}
 
 var _wsClient *apigatewaymanagementapi.Client
 
@@ -61,16 +37,4 @@ func DeleteWebSocket(ctx context.Context, connectionId string) error {
 		ConnectionId: aws.String(connectionId),
 	})
 	return err
-}
-
-func RESTResponse(statusCode int, headers map[string]string, body string) events.APIGatewayProxyResponse {
-	return events.APIGatewayProxyResponse{
-		StatusCode: statusCode,
-		Headers:    headers,
-		Body:       body,
-	}
-}
-
-type RESTErrorMessage struct {
-	Message string `json:"message"`
 }

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"great-kingdom-lambda/lib/ddb"
+	"great-kingdom-lambda/lib/vars"
 	"log"
 	"net/http"
-	"sam-app/ddb"
-	"sam-app/vars"
+
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"

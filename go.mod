@@ -31,6 +31,6 @@ require (
 
 replace gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 
-module sam-app
+module great-kingdom-lambda
 
 go 1.21

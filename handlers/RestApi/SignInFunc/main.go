@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"sam-app/auth"
-	"sam-app/awsutils"
-	"sam-app/ddb"
-	"sam-app/vars"
+	"great-kingdom-lambda/lib/auth"
+	"great-kingdom-lambda/lib/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -19,14 +17,14 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 
 	user, err := ddb.GetUser(ctx, reqBody.Id)
 	if err != nil {
-		b, _ := json.Marshal(vars.ErrorResponseBody{Message: "login failed"})
-		return awsutils.RESTResponse(400, auth.CORSHeaders, string(b)), nil
+		b, _ := json.Marshal(auth.ErrorResponseBody{Message: "login failed"})
+		return auth.RESTResponse(400, auth.CORSHeaders, string(b)), nil
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(reqBody.Password))
 	if err != nil {
-		b, _ := json.Marshal(vars.ErrorResponseBody{Message: "login failed"})
-		return awsutils.RESTResponse(400, auth.CORSHeaders, string(b)), nil
+		b, _ := json.Marshal(auth.ErrorResponseBody{Message: "login failed"})
+		return auth.RESTResponse(400, auth.CORSHeaders, string(b)), nil
 	}
 
 	a, r, err := auth.GenerateTokenSet(reqBody.Id)
@@ -41,7 +39,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 
 	resBody, _ := json.Marshal(auth.AuthBody{Authorized: true, AccessToken: a, Id: user.UserId})
-	return awsutils.RESTResponse(200, auth.AuthHeaders(r), string(resBody)), nil
+	return auth.RESTResponse(200, auth.AuthHeaders(r), string(resBody)), nil
 }
 
 func main() {

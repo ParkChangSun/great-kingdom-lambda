@@ -3,10 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"sam-app/auth"
-	"sam-app/awsutils"
-	"sam-app/ddb"
-	"sam-app/vars"
+	"great-kingdom-lambda/lib/auth"
+	"great-kingdom-lambda/lib/ddb"
+	"great-kingdom-lambda/lib/vars"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -25,7 +24,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 
 	resBody, _ := json.Marshal(auth.AuthBody{Authorized: false, AccessToken: "", Id: ""})
-	return awsutils.RESTResponse(200, map[string]string{
+	return auth.RESTResponse(200, map[string]string{
 		"Access-Control-Allow-Credentials": "true",
 		"Access-Control-Allow-Origin":      vars.CLIENT_ORIGIN,
 		"Set-Cookie":                       auth.ExpiredCookie,

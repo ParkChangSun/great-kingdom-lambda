@@ -3,9 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"sam-app/auth"
-	"sam-app/awsutils"
-	"sam-app/ddb"
+	"great-kingdom-lambda/lib/auth"
+	"great-kingdom-lambda/lib/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -19,7 +18,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 
 	if body.GameTableName == "" {
-		return awsutils.RESTResponse(400, auth.CORSHeaders, ""), nil
+		return auth.RESTResponse(400, auth.CORSHeaders, ""), nil
 	}
 
 	id, err := ddb.PutGameTable(ctx, body.GameTableName)
@@ -28,7 +27,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 
 	b, _ := json.Marshal(struct{ GameTableId string }{GameTableId: id})
-	return awsutils.RESTResponse(201, auth.CORSHeaders, string(b)), nil
+	return auth.RESTResponse(201, auth.CORSHeaders, string(b)), nil
 }
 
 func main() {

@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"sam-app/awsutils"
-	"sam-app/ddb"
-	"sam-app/vars"
+	"fmt"
+	"great-kingdom-lambda/lib/ddb"
+
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -13,9 +14,10 @@ import (
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 	chat := struct{ Chat string }{}
-	err := json.Unmarshal([]byte(req.Body), &chat)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
+	json.Unmarshal([]byte(req.Body), &chat)
+	msg := strings.Trim(chat.Chat, " ")
+	if msg == "" {
+		return events.APIGatewayProxyResponse{}, nil
 	}
 
 	conn, err := ddb.GetConnection(ctx, req.RequestContext.ConnectionID)
@@ -23,16 +25,12 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	r := ddb.Record{
-		EventType:         vars.TABLECHATEVENT,
-		ConnectionDDBItem: conn,
-		Chat:              chat.Chat,
-		Timestamp:         req.RequestContext.RequestTimeEpoch,
-	}
-	err = awsutils.SendToQueue(ctx, r, r.GameTableId)
+	l, err := ddb.GetGameTable(ctx, conn.GameTableId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
+
+	l.BroadcastChat(ctx, fmt.Sprint(conn.UserId, " : ", msg))
 
 	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 }

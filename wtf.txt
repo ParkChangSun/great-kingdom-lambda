@@ -2,7 +2,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMDY
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMzkwN30.6Mcd5pxtA_mA3DrxRiZJfVppU_c0UbCagRmr6E6kwK4 cookie
 
 todo
-타이머
+항복 타이머
 
 
 2차 목표
@@ -13,7 +13,7 @@ todo
 부가 목표 / 배포 이후
 레이팅
 기보
-방목록은 unauth 입장은 auth로 하면 어떨까 웹소켓 auth
+방목록은 unauth 입장은 auth로 하면 어떨까 웹소켓 auth 그럼 방목록은 load로 하면됨
 큐에 게임까지 넣어도 되겠지? 아니면 테이블/게임 디비으로 분리할까 큐에 넣어도 되는 정상이벤트인지 아닌지 판단하고 넣기
 게임은 걍 합칠까 챗제외
 글로벌챗 디비 분리

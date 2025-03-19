@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"sam-app/auth"
-	"sam-app/ddb"
+	"great-kingdom-lambda/lib/auth"
+	"great-kingdom-lambda/lib/ddb"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"

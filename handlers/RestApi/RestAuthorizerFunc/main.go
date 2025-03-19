@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"great-kingdom-lambda/lib/auth"
 	"log"
-	"sam-app/auth"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"

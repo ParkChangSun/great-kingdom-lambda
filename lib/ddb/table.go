@@ -2,10 +2,10 @@ package ddb
 
 import (
 	"context"
+	"great-kingdom-lambda/lib/game"
+	"great-kingdom-lambda/lib/vars"
+	"great-kingdom-lambda/lib/ws"
 	"log"
-	"sam-app/awsutils"
-	"sam-app/game"
-	"sam-app/vars"
 	"slices"
 	"time"
 
@@ -180,7 +180,7 @@ func (s GameTableDDBItem) BroadcastGame(ctx context.Context) {
 
 func (s GameTableDDBItem) Broadcast(ctx context.Context, payload GameTableBroadcastPayload) {
 	for _, c := range s.Connections {
-		err := awsutils.SendWebsocketMessage(ctx, c.ConnectionId, payload)
+		err := ws.SendWebsocketMessage(ctx, c.ConnectionId, payload)
 		if err != nil {
 			log.Print(err)
 		}

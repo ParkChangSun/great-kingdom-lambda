@@ -1,10 +1,11 @@
 package auth
 
 import (
+	"great-kingdom-lambda/lib/vars"
 	"net/http"
-	"sam-app/vars"
 	"time"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -75,4 +76,16 @@ func GenerateTokenSet(userId string) (string, string, error) {
 		return "", "", err
 	}
 	return signedAccess, signedRefresh, nil
+}
+
+func RESTResponse(statusCode int, headers map[string]string, body string) events.APIGatewayProxyResponse {
+	return events.APIGatewayProxyResponse{
+		StatusCode: statusCode,
+		Headers:    headers,
+		Body:       body,
+	}
+}
+
+type ErrorResponseBody struct {
+	Message string `json:"message"`
 }
