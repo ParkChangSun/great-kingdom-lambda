@@ -24,6 +24,9 @@ type GameTableDDBItem struct {
 	Players       []string
 	CoinToss      []string
 	Game          game.Game
+
+	LastMove      int64
+	RemainingTime []int64
 }
 
 func GameTableDDBKey(gameTableId string) map[string]types.AttributeValue {
@@ -88,10 +91,8 @@ func ScanGameTable(ctx context.Context) ([]GameTableDDBItem, error) {
 	return items, nil
 }
 
-func (l GameTableDDBItem) SyncGame(ctx context.Context) error {
-	update := expression.Set(expression.Name("Game"), expression.Value(l.Game))
+func (l GameTableDDBItem) Sync(ctx context.Context, update expression.UpdateBuilder) error {
 	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
-
 	_, err := client(ctx).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(vars.GAME_TABLE_DYNAMODB),
 		Key:                       GameTableDDBKey(l.GameTableId),
@@ -99,12 +100,19 @@ func (l GameTableDDBItem) SyncGame(ctx context.Context) error {
 		ExpressionAttributeValues: expr.Values(),
 		UpdateExpression:          expr.Update(),
 	})
-
 	return err
 }
 
+func (l GameTableDDBItem) SyncGame(ctx context.Context) error {
+	return l.Sync(ctx, expression.Set(
+		expression.Name("Game"),
+		expression.Value(l.Game),
+	))
+
+}
+
 func (l GameTableDDBItem) SyncConnections(ctx context.Context) error {
-	update := expression.Set(
+	return l.Sync(ctx, expression.Set(
 		expression.Name("Connections"),
 		expression.Value(l.Connections),
 	).Set(
@@ -113,18 +121,17 @@ func (l GameTableDDBItem) SyncConnections(ctx context.Context) error {
 	).Set(
 		expression.Name("CoinToss"),
 		expression.Value(l.CoinToss),
-	)
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
+	))
+}
 
-	_, err := client(ctx).UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(vars.GAME_TABLE_DYNAMODB),
-		Key:                       GameTableDDBKey(l.GameTableId),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-		UpdateExpression:          expr.Update(),
-	})
-
-	return err
+func (l GameTableDDBItem) SyncTimer(ctx context.Context) error {
+	return l.Sync(ctx, expression.Set(
+		expression.Name("LastMove"),
+		expression.Value(l.LastMove),
+	).Set(
+		expression.Name("RemainingTime"),
+		expression.Value(l.RemainingTime),
+	))
 }
 
 func (l GameTableDDBItem) ProcessGameResult(ctx context.Context, winner int) error {
@@ -151,10 +158,16 @@ func (l GameTableDDBItem) ProcessGameResult(ctx context.Context, winner int) err
 
 func (l *GameTableDDBItem) StartNewGame() {
 	l.Game.StartNewGame()
+
+	nowMilli := time.Now().UnixMilli()
 	l.CoinToss = slices.Clone(l.Players)
-	if time.Now().Nanosecond()%2 == 0 {
+	if nowMilli%2 == 0 {
 		slices.Reverse(l.CoinToss)
 	}
+
+	t, _ := time.ParseDuration("5m")
+	l.RemainingTime = []int64{t.Milliseconds(), t.Milliseconds()}
+	l.LastMove = nowMilli
 }
 
 type GameTableBroadcastPayload struct {
@@ -164,20 +177,6 @@ type GameTableBroadcastPayload struct {
 	Auth              bool
 }
 
-func (s GameTableDDBItem) BroadcastChat(ctx context.Context, chat string) {
-	s.Broadcast(ctx, GameTableBroadcastPayload{
-		EventType: vars.CHATBROADCAST,
-		Chat:      chat,
-	})
-}
-
-func (s GameTableDDBItem) BroadcastGame(ctx context.Context) {
-	s.Broadcast(ctx, GameTableBroadcastPayload{
-		EventType:        vars.TABLEBROADCAST,
-		GameTableDDBItem: &s,
-	})
-}
-
 func (s GameTableDDBItem) Broadcast(ctx context.Context, payload GameTableBroadcastPayload) {
 	for _, c := range s.Connections {
 		err := ws.SendWebsocketMessage(ctx, c.ConnectionId, payload)
@@ -185,4 +184,18 @@ func (s GameTableDDBItem) Broadcast(ctx context.Context, payload GameTableBroadc
 			log.Print(err)
 		}
 	}
+}
+
+func (s GameTableDDBItem) BroadcastChat(ctx context.Context, chat string) {
+	s.Broadcast(ctx, GameTableBroadcastPayload{
+		EventType: vars.CHATBROADCAST,
+		Chat:      chat,
+	})
+}
+
+func (s GameTableDDBItem) BroadcastTable(ctx context.Context) {
+	s.Broadcast(ctx, GameTableBroadcastPayload{
+		EventType:        vars.TABLEBROADCAST,
+		GameTableDDBItem: &s,
+	})
 }

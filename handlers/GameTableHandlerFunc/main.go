@@ -9,6 +9,7 @@ import (
 	"great-kingdom-lambda/lib/vars"
 	"great-kingdom-lambda/lib/ws"
 	"log"
+	"time"
 
 	"slices"
 
@@ -18,9 +19,7 @@ import (
 
 func joinEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
 	if slices.ContainsFunc(l.Connections, func(c ddb.ConnectionDDBItem) bool { return c.UserId == record.UserId }) {
-		log.Print("dup conn detected")
-		ws.DeleteWebSocket(ctx, record.ConnectionId)
-		return nil
+		return ws.DeleteWebSocket(ctx, record.ConnectionId)
 	}
 
 	l.Connections = append(l.Connections, record.ConnectionDDBItem)
@@ -33,7 +32,7 @@ func joinEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 		return err
 	}
 
-	l.BroadcastGame(ctx)
+	l.BroadcastTable(ctx)
 	l.BroadcastChat(ctx, fmt.Sprint(record.UserId, " has joined the game."))
 
 	return nil
@@ -48,7 +47,7 @@ func leaveEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) 
 	l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == record.UserId })
 	if l.Game.Playing && len(l.Players) < 2 {
 		l.ProcessGameResult(ctx, slices.IndexFunc(l.CoinToss, func(u string) bool { return u == l.Players[0] }))
-		l.BroadcastChat(ctx, fmt.Sprint(l.Players[0], " won."))
+		l.BroadcastChat(ctx, fmt.Sprint(l.Players[0], " surrender."))
 
 		l.Game.Playing = false
 		err := l.SyncGame(ctx)
@@ -62,7 +61,7 @@ func leaveEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) 
 		return err
 	}
 
-	l.BroadcastGame(ctx)
+	l.BroadcastTable(ctx)
 	l.BroadcastChat(ctx, fmt.Sprint(record.UserId, " has left the game."))
 
 	return nil
@@ -71,7 +70,9 @@ func leaveEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) 
 func slotEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
 	if l.Game.Playing {
 		return nil
-	} else if slices.ContainsFunc(l.Players, func(u string) bool { return u == record.UserId }) {
+	}
+
+	if slices.ContainsFunc(l.Players, func(u string) bool { return u == record.UserId }) {
 		l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == record.UserId })
 	} else if len(l.Players) < 2 {
 		l.Players = append(l.Players, record.UserId)
@@ -84,7 +85,7 @@ func slotEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 		return err
 	}
 
-	l.BroadcastGame(ctx)
+	l.BroadcastTable(ctx)
 
 	return nil
 }
@@ -104,8 +105,12 @@ func startEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) 
 	if err != nil {
 		return err
 	}
+	err = l.SyncTimer(ctx)
+	if err != nil {
+		return err
+	}
 
-	l.BroadcastGame(ctx)
+	l.BroadcastTable(ctx)
 	l.BroadcastChat(ctx, fmt.Sprint("Game start. ", l.CoinToss[0], " plays first."))
 
 	return nil
@@ -116,12 +121,24 @@ func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 		return nil
 	}
 
+	now := time.Now().UnixMilli()
+	l.RemainingTime[(l.Game.Turn-1)%2] -= now - l.LastMove
+	l.LastMove = now
+
+	if l.RemainingTime[(l.Game.Turn-1)%2] <= 0 || record.Surrender {
+		l.Game.Playing = false
+		err := l.SyncGame(ctx)
+		if err != nil {
+			return err
+		}
+		l.ProcessGameResult(ctx, l.Game.Turn%2)
+		l.BroadcastTable(ctx)
+		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.CoinToss[(l.Game.Turn+1)%2], " surrender"))
+		return nil
+	}
+
 	if record.Pass {
 		l.Game.Pass()
-	} else if record.Surrender {
-		l.Game.Playing = false
-		l.ProcessGameResult(ctx, l.Game.Turn%2)
-		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.CoinToss[(l.Game.Turn+1)%2], " surrendered."))
 	} else if l.Game.CellPlayable(record.Move) {
 		l.Game.Move(record.Move)
 	} else {
@@ -142,9 +159,29 @@ func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 	if err != nil {
 		return err
 	}
+	err = l.SyncTimer(ctx)
+	if err != nil {
+		return err
+	}
 
-	l.BroadcastGame(ctx)
+	l.BroadcastTable(ctx)
 
+	return nil
+}
+
+func kickEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
+	if !l.Game.Playing || l.CoinToss[l.Game.Turn%2] != record.UserId {
+		return nil
+	}
+
+	term := time.Now().UnixMilli() - l.LastMove
+
+	if l.RemainingTime[(l.Game.Turn+1)%2] <= term {
+		l.Game.Playing = false
+		l.ProcessGameResult(ctx, l.Game.Turn%2)
+		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.CoinToss[(l.Game.Turn+1)%2], " surrender"))
+		return nil
+	}
 	return nil
 }
 
@@ -177,6 +214,9 @@ func handler(ctx context.Context, req events.SQSEvent) {
 
 		case vars.TABLESTARTEVENT:
 			err = startEvent(ctx, r, l)
+
+		case vars.KICK:
+			kickEvent(ctx, r, l)
 		}
 
 		if err != nil {
