@@ -2,31 +2,22 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMDY
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMzkwN30.6Mcd5pxtA_mA3DrxRiZJfVppU_c0UbCagRmr6E6kwK4 cookie
 
 todo
-브로드캐스트 테이블/게임으로 나누기?
-타이머 킥
-홈페이지 살짝 간략하게 하고 전체채팅으로 피드백주세요 등등 앱 기능 소개
-테이블 말고 grid div로 게임판늘어나는이슈
-
-로그인하세요: 로테이션 말고 일반요청이 403 forbidden
+방목록은 unauth 입장은 auth로 하면 어떨까 그럼 방목록은 load로 하면됨
 
 
-2차 목표
-
+정리
 
 
 부가 목표 / 배포 이후
+테이블에서 새로고침했을때?
+마우스 올리면 유저 정보
+랭킹?
+스샷찍어서 소개
 레이팅
 기보
-방목록은 unauth 입장은 auth로 하면 어떨까 웹소켓 auth 그럼 방목록은 load로 하면됨
-
 게이트웨이 캐싱 cloudfront 캐싱 => 유저 생길 시 중요
+중복 요청 방지
 언어 설정
-그냥 펑션 폴리시 롤로 줘도 될거같은데
-cloudformation 계층화
-arm64 / httpapi / role
-s3 / route53?
-keep-alive?
+arm64 / httpapi / role / s3 / ssm parameter store / application
 prod dev 분리
-ssm parameter store
 게시판 xss csrf 방어 대책
-시간초과 step function?

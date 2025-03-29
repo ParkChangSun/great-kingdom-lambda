@@ -46,7 +46,7 @@ func leaveEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) 
 
 	l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == record.UserId })
 	if l.Game.Playing && len(l.Players) < 2 {
-		l.ProcessGameResult(ctx, slices.IndexFunc(l.CoinToss, func(u string) bool { return u == l.Players[0] }))
+		l.ProcessGameResult(ctx, slices.IndexFunc(l.Game.CoinToss, func(u string) bool { return u == l.Players[0] }))
 		l.BroadcastChat(ctx, fmt.Sprint(l.Players[0], " surrender."))
 
 		l.Game.Playing = false
@@ -95,37 +95,29 @@ func startEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) 
 		return nil
 	}
 
-	l.StartNewGame()
+	l.Game.StartNewGame(l.Players)
 
 	err := l.SyncGame(ctx)
 	if err != nil {
 		return err
 	}
-	err = l.SyncConnections(ctx)
-	if err != nil {
-		return err
-	}
-	err = l.SyncTimer(ctx)
-	if err != nil {
-		return err
-	}
 
 	l.BroadcastTable(ctx)
-	l.BroadcastChat(ctx, fmt.Sprint("Game start. ", l.CoinToss[0], " plays first."))
+	l.BroadcastChat(ctx, fmt.Sprint("Game start. ", l.Game.CoinToss[0], " plays first."))
 
 	return nil
 }
 
 func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
-	if !l.Game.Playing || l.CoinToss[(l.Game.Turn-1)%2] != record.UserId {
+	if !l.Game.Playing || l.Game.CoinToss[(l.Game.Turn-1)%2] != record.UserId {
 		return nil
 	}
 
 	now := time.Now().UnixMilli()
-	l.RemainingTime[(l.Game.Turn-1)%2] -= now - l.LastMove
-	l.LastMove = now
+	l.Game.RemainingTime[(l.Game.Turn-1)%2] -= now - l.Game.LastMoveTime
+	l.Game.LastMoveTime = now
 
-	if l.RemainingTime[(l.Game.Turn-1)%2] <= 0 || record.Surrender {
+	if l.Game.RemainingTime[(l.Game.Turn-1)%2] <= 0 || record.Surrender {
 		l.Game.Playing = false
 		err := l.SyncGame(ctx)
 		if err != nil {
@@ -133,7 +125,7 @@ func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 		}
 		l.ProcessGameResult(ctx, l.Game.Turn%2)
 		l.BroadcastTable(ctx)
-		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.CoinToss[(l.Game.Turn+1)%2], " surrender"))
+		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.Game.CoinToss[(l.Game.Turn+1)%2], " surrender"))
 		return nil
 	}
 
@@ -149,17 +141,15 @@ func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 		b, o, sieged, w := l.Game.CountTerritory()
 		l.ProcessGameResult(ctx, w)
 		if sieged {
-			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.CoinToss[w], " sieged its opponent."))
+			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.Game.CoinToss[w], " sieged its opponent."))
 		} else {
-			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", b, " : ", o, "(+2.5)", " ", l.CoinToss[w], " won."))
+			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", b, " : ", o, "(+2.5)", " ", l.Game.CoinToss[w], " won."))
 		}
 	}
 
+	l.Game.RemainingTime[(l.Game.Turn-1)%2] += 1000
+
 	err := l.SyncGame(ctx)
-	if err != nil {
-		return err
-	}
-	err = l.SyncTimer(ctx)
 	if err != nil {
 		return err
 	}
@@ -170,18 +160,31 @@ func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 }
 
 func kickEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
-	if !l.Game.Playing || l.CoinToss[l.Game.Turn%2] != record.UserId {
+	if !l.Game.Playing || l.Game.CoinToss[l.Game.Turn%2] != record.UserId || l.Game.RemainingTime[(l.Game.Turn+1)%2] > time.Now().UnixMilli()-l.Game.LastMoveTime {
 		return nil
 	}
 
-	term := time.Now().UnixMilli() - l.LastMove
-
-	if l.RemainingTime[(l.Game.Turn+1)%2] <= term {
-		l.Game.Playing = false
-		l.ProcessGameResult(ctx, l.Game.Turn%2)
-		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.CoinToss[(l.Game.Turn+1)%2], " surrender"))
-		return nil
+	l.Game.Playing = false
+	l.ProcessGameResult(ctx, l.Game.Turn%2)
+	err := l.SyncGame(ctx)
+	if err != nil {
+		return err
 	}
+
+	kickedId := l.Game.CoinToss[(l.Game.Turn+1)%2]
+	l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == kickedId })
+	i := slices.IndexFunc(l.Connections, func(u ddb.ConnectionDDBItem) bool { return u.UserId == kickedId })
+	err = ws.DeleteWebSocket(ctx, l.Connections[i].ConnectionId)
+	if err != nil {
+		return err
+	}
+	l.Connections = slices.Delete(l.Connections, i, i+1)
+
+	l.SyncConnections(ctx)
+
+	l.BroadcastChat(ctx, fmt.Sprint(l.Game.CoinToss[(l.Game.Turn+1)%2], " timeout"))
+	l.BroadcastTable(ctx)
+
 	return nil
 }
 

@@ -6,8 +6,6 @@ import (
 	"great-kingdom-lambda/lib/vars"
 	"great-kingdom-lambda/lib/ws"
 	"log"
-	"slices"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -22,11 +20,7 @@ type GameTableDDBItem struct {
 	GameTableName string
 	Connections   []ConnectionDDBItem
 	Players       []string
-	CoinToss      []string
 	Game          game.Game
-
-	LastMove      int64
-	RemainingTime []int64
 }
 
 func GameTableDDBKey(gameTableId string) map[string]types.AttributeValue {
@@ -40,8 +34,11 @@ func PutGameTable(ctx context.Context, tableName string) (string, error) {
 		GameTableId:   id,
 		GameTableName: tableName,
 		Players:       []string{},
-		CoinToss:      []string{},
 		Connections:   []ConnectionDDBItem{},
+		Game: game.Game{
+			CoinToss:      []string{"", ""},
+			RemainingTime: []int64{},
+		},
 	})
 
 	_, err := client(ctx).PutItem(ctx, &dynamodb.PutItemInput{
@@ -118,27 +115,14 @@ func (l GameTableDDBItem) SyncConnections(ctx context.Context) error {
 	).Set(
 		expression.Name("Players"),
 		expression.Value(l.Players),
-	).Set(
-		expression.Name("CoinToss"),
-		expression.Value(l.CoinToss),
-	))
-}
-
-func (l GameTableDDBItem) SyncTimer(ctx context.Context) error {
-	return l.Sync(ctx, expression.Set(
-		expression.Name("LastMove"),
-		expression.Value(l.LastMove),
-	).Set(
-		expression.Name("RemainingTime"),
-		expression.Value(l.RemainingTime),
 	))
 }
 
 func (l GameTableDDBItem) ProcessGameResult(ctx context.Context, winner int) error {
-	win, _ := GetUser(ctx, l.CoinToss[winner])
-	lose, _ := GetUser(ctx, l.CoinToss[(winner+1)%2])
+	win, _ := GetUser(ctx, l.Game.CoinToss[winner])
+	lose, _ := GetUser(ctx, l.Game.CoinToss[(winner+1)%2])
 
-	item := RecentGame{BlueId: l.CoinToss[0], OrangeId: l.CoinToss[1], WinnerId: l.CoinToss[winner]}
+	item := RecentGame{BlueId: l.Game.CoinToss[0], OrangeId: l.Game.CoinToss[1], WinnerId: l.Game.CoinToss[winner]}
 	win.RecentGames = append(win.RecentGames, item)
 	if len(win.RecentGames) > 10 {
 		win.RecentGames = win.RecentGames[1:]
@@ -154,20 +138,6 @@ func (l GameTableDDBItem) ProcessGameResult(ctx context.Context, winner int) err
 	win.SyncRecord(ctx)
 	lose.SyncRecord(ctx)
 	return nil
-}
-
-func (l *GameTableDDBItem) StartNewGame() {
-	l.Game.StartNewGame()
-
-	nowMilli := time.Now().UnixMilli()
-	l.CoinToss = slices.Clone(l.Players)
-	if nowMilli%2 == 0 {
-		slices.Reverse(l.CoinToss)
-	}
-
-	t, _ := time.ParseDuration("5m")
-	l.RemainingTime = []int64{t.Milliseconds(), t.Milliseconds()}
-	l.LastMove = nowMilli
 }
 
 type GameTableBroadcastPayload struct {

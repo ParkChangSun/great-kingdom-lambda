@@ -15,22 +15,9 @@ const (
 
 const TERRITORYOFFSET = 2
 
-type Game struct {
-	Turn     int
-	PassFlag bool
-	Playing  bool
-	Board    [9][9]CellStatus
-}
-
 type Point struct {
 	R int
 	C int
-}
-
-type Move struct {
-	Point Point
-	Pass  bool
-	Start bool
 }
 
 func (p Point) getNeighbors() []Point {
@@ -154,6 +141,7 @@ func (g *Game) Move(p Point) {
 	attackerColor, _ := g.getPlayerColor()
 
 	g.putPiece(p, attackerColor)
+	g.LastMove = &p
 
 	sieged := false
 	for _, n := range p.getNeighbors() {
@@ -197,6 +185,7 @@ func (g *Game) Pass() {
 		return
 	}
 	g.PassFlag = true
+	g.LastMove = nil
 	g.Turn++
 }
 
@@ -222,12 +211,4 @@ func (g Game) CountTerritory() (blue int, orange int, sieged bool, winner int) {
 		winner = 1
 	}
 	return
-}
-
-func (g *Game) StartNewGame() {
-	g.Turn = 1
-	g.PassFlag = false
-	g.Playing = true
-	g.Board = [9][9]CellStatus{}
-	g.Board[4][4] = NEUTRALCASTLE
 }

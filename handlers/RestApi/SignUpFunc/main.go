@@ -19,19 +19,22 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 
 	_, err := ddb.GetUser(ctx, body.Id)
 	if !errors.Is(err, ddb.ErrItemNotFound) {
-		return auth.RESTResponse(400, auth.CORSHeaders, "id exists"), nil
+		b, _ := json.Marshal(auth.ErrorResponseBody{Message: "id exists"})
+		return auth.RESTResponse(400, auth.CORSHeaders, string(b)), nil
 	}
 
-	idlen := regexp.MustCompile(`^[0-9a-zA-Z]{6,30}$`)
+	idlen := regexp.MustCompile(`^[0-9a-zA-Z]{4,15}$`)
 	if !idlen.Match([]byte(body.Id)) {
-		return auth.RESTResponse(400, auth.CORSHeaders, "The id should contain a combination of 6 to 30 letters and numbers."), nil
+		b, _ := json.Marshal(auth.ErrorResponseBody{Message: "The id should contain a combination of 4 to 15 letters and numbers."})
+		return auth.RESTResponse(400, auth.CORSHeaders, string(b)), nil
 	}
 
 	num := regexp.MustCompile(`[0-9]`)
 	eng := regexp.MustCompile(`[a-zA-Z]`)
 	bytelen := regexp.MustCompile(`^[a-zA-Z0-9@#$%^&*]{6,30}$`)
 	if !num.Match([]byte(body.Password)) || !eng.Match([]byte(body.Password)) || !bytelen.Match([]byte(body.Password)) {
-		return auth.RESTResponse(400, auth.CORSHeaders, "The password must contain a combination of 6 to 30 letters and numbers."), nil
+		b, _ := json.Marshal(auth.ErrorResponseBody{Message: "The password must contain a combination of 6 to 30 letters and numbers."})
+		return auth.RESTResponse(400, auth.CORSHeaders, string(b)), nil
 	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
 
