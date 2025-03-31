@@ -176,6 +176,7 @@ func (g *Game) Move(p Point) {
 		return
 	}
 
+	g.RemainingTime[(g.Turn+1)%2] += 1000
 	g.Turn++
 }
 
@@ -186,6 +187,7 @@ func (g *Game) Pass() {
 	}
 	g.PassFlag = true
 	g.LastMove = nil
+	g.RemainingTime[(g.Turn+1)%2] += 1000
 	g.Turn++
 }
 

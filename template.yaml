@@ -359,6 +359,9 @@ Resources:
         - AmazonSQSFullAccess
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref GameTableDynamoDB
+        - AmazonAPIGatewayInvokeFullAccess
 
   ChatPermission:
     Type: AWS::Lambda::Permission

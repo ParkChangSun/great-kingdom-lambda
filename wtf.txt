@@ -1,23 +1,24 @@
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMDYwN30.aMakOT0BAtR62gRFDR9E5qQMvM28YwWpwDNHDLJ1zDA access
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZHNhZmRzYSIsImV4cCI6MTc0MTAyMzkwN30.6Mcd5pxtA_mA3DrxRiZJfVppU_c0UbCagRmr6E6kwK4 cookie
-
 todo
-방목록은 unauth 입장은 auth로 하면 어떨까 그럼 방목록은 load로 하면됨
 
 
 정리
 
 
 부가 목표 / 배포 이후
-테이블에서 새로고침했을때?
+디비 아이템 타임스탬프
+체닷은 기보가 위에 있고 아래에 채칭/관전자 가 탭으로 나누어져 있다
+보드&버튼 / 위에 기보/관전자들 탭으로 / 아래에 채팅
 마우스 올리면 유저 정보
-랭킹?
-스샷찍어서 소개
-레이팅
-기보
+레이팅 랭킹
+로비 방목록과 채팅 받기는 unauth, 방만들기와 채팅치기는 auth로 하기
 게이트웨이 캐싱 cloudfront 캐싱 => 유저 생길 시 중요
-중복 요청 방지
 언어 설정
 arm64 / httpapi / role / s3 / ssm parameter store / application
 prod dev 분리
 게시판 xss csrf 방어 대책
+프론트 s3 cloudformation 템플릿?
+
+
+문제
+혼자있을때 새고로침
+2시간 지나면 연결해제됨

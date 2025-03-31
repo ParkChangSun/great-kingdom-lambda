@@ -26,6 +26,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	if err != nil {
 		ws.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, ddb.GameTableBroadcastPayload{EventType: vars.AUTHBROADCAST, Auth: false})
 		ws.DeleteWebSocket(ctx, req.RequestContext.ConnectionID)
+		ddb.DeleteConnInPool(ctx, conn.ConnectionId)
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 

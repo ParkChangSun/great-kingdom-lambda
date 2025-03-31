@@ -10,11 +10,23 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	if _, ok := req.QueryStringParameters["GameTableId"]; !ok {
+	id := req.QueryStringParameters["GameTableId"]
+
+	if id == "globalchat" {
+		err := ddb.PutConnInPool(ctx, ddb.ConnectionDDBItem{
+			ConnectionId: req.RequestContext.ConnectionID,
+			GameTableId:  "globalchat",
+			UserId:       "",
+		})
+		if err != nil {
+			return events.APIGatewayProxyResponse{}, err
+		}
+	}
+
+	if id == "" {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
 			Headers:    auth.CORSHeaders,
-			Body:       "id not found",
 		}, nil
 	}
 

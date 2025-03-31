@@ -19,6 +19,7 @@ import (
 
 func joinEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
 	if slices.ContainsFunc(l.Connections, func(c ddb.ConnectionDDBItem) bool { return c.UserId == record.UserId }) {
+		ddb.DeleteConnInPool(ctx, record.ConnectionId)
 		return ws.DeleteWebSocket(ctx, record.ConnectionId)
 	}
 
@@ -147,8 +148,6 @@ func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 		}
 	}
 
-	l.Game.RemainingTime[(l.Game.Turn-1)%2] += 1000
-
 	err := l.SyncGame(ctx)
 	if err != nil {
 		return err
@@ -198,7 +197,11 @@ func handler(ctx context.Context, req events.SQSEvent) {
 
 		l, err := ddb.GetGameTable(ctx, r.GameTableId)
 		if err != nil {
-			log.Print(err)
+			ddb.DeleteConnInPool(ctx, r.ConnectionId)
+			err = ws.DeleteWebSocket(ctx, r.ConnectionId)
+			if err != nil {
+				log.Print(err)
+			}
 			continue
 		}
 
