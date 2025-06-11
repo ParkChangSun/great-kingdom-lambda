@@ -5,6 +5,7 @@ import (
 	"great-kingdom-lambda/lib/ddb"
 	"great-kingdom-lambda/lib/sqs"
 	"great-kingdom-lambda/lib/vars"
+	"great-kingdom-lambda/lib/ws"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -17,6 +18,20 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	}
 
 	if conn.GameTableId == "globalchat" {
+		conns, err := ddb.QueryGlobalChat(ctx)
+		if err != nil {
+			return events.APIGatewayProxyResponse{}, err
+		}
+		users := []string{}
+		for _, v := range conns {
+			users = append(users, v.UserId)
+		}
+		for _, v := range conns {
+			ws.SendWebsocketMessage(ctx, v.ConnectionId, struct {
+				EventType string
+				Users     []string
+			}{EventType: "USERS", Users: users})
+		}
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
@@ -25,7 +40,6 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		ConnectionDDBItem: conn,
 		Timestamp:         req.RequestContext.RequestTimeEpoch,
 	}
-
 	err = sqs.SendToQueue(ctx, r, r.GameTableId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err

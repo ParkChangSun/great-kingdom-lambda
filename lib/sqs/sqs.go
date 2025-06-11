@@ -38,7 +38,7 @@ type GameTableEvent struct {
 	EventType vars.TABLEEVENTTYPE
 	Move      game.Point
 	Pass      bool
-	Surrender bool
+	Resign    bool
 }
 
 type Record struct {

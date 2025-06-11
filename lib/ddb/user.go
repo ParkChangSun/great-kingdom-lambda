@@ -11,75 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-type ConnectionDDBItem struct {
-	ConnectionId string
-	UserId       string
-	GameTableId  string
-}
-
-func PutConnInPool(ctx context.Context, conn ConnectionDDBItem) error {
-	item, _ := attributevalue.MarshalMap(conn)
-
-	_, err := client(ctx).PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(vars.CONNECTION_DYNAMODB),
-		Item:      item,
-	})
-
-	return err
-}
-
-func DeleteConnInPool(ctx context.Context, connId string) (ConnectionDDBItem, error) {
-	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{connId})
-
-	out, err := client(ctx).DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName:    aws.String(vars.CONNECTION_DYNAMODB),
-		Key:          key,
-		ReturnValues: "ALL_OLD",
-	})
-	if err != nil {
-		return ConnectionDDBItem{}, err
-	}
-
-	item := ConnectionDDBItem{}
-	err = attributevalue.UnmarshalMap(out.Attributes, &item)
-	return item, err
-}
-
-func GetConnection(ctx context.Context, connectionId string) (ConnectionDDBItem, error) {
-	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{connectionId})
-	query, err := client(ctx).GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(vars.CONNECTION_DYNAMODB),
-		Key:       key,
-	})
-	if err != nil {
-		return ConnectionDDBItem{}, err
-	}
-	if query.Item == nil {
-		return ConnectionDDBItem{}, ErrItemNotFound
-	}
-
-	record := ConnectionDDBItem{}
-	attributevalue.UnmarshalMap(query.Item, &record)
-	return record, nil
-}
-
-func (c ConnectionDDBItem) UpdateUserId(ctx context.Context) error {
-	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{c.ConnectionId})
-	update := expression.Set(
-		expression.Name("UserId"),
-		expression.Value(c.UserId),
-	)
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
-	_, err := client(ctx).UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(vars.CONNECTION_DYNAMODB),
-		Key:                       key,
-		UpdateExpression:          expr.Update(),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-	})
-	return err
-}
-
 type UserDDBItem struct {
 	UserId       string
 	PasswordHash string `json:"-"`
@@ -90,6 +21,7 @@ type UserDDBItem struct {
 
 type RecentGame struct {
 	BlueId, OrangeId, WinnerId string
+	CreatedDate                string
 }
 
 func UserDDBItemKey(userId string) map[string]types.AttributeValue {
@@ -120,7 +52,7 @@ func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
 		return UserDDBItem{}, err
 	}
 	if query.Item == nil {
-		return UserDDBItem{}, ErrItemNotFound
+		return UserDDBItem{}, &ItemNotFoundError{vars.USER_DYNAMODB, userId}
 	}
 
 	item := UserDDBItem{}

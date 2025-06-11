@@ -2,7 +2,7 @@ package ddb
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -18,4 +18,11 @@ func client(ctx context.Context) *dynamodb.Client {
 	return ddbClient
 }
 
-var ErrItemNotFound = errors.New("dynamodb item not found")
+type ItemNotFoundError struct {
+	TableName string
+	Key       string
+}
+
+func (e *ItemNotFoundError) Error() string {
+	return fmt.Sprintf("gk:ddb - item not found in table '%s' with key '%s'", e.TableName, e.Key)
+}

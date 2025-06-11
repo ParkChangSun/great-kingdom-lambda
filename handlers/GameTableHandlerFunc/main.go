@@ -118,7 +118,7 @@ func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 	l.Game.RemainingTime[(l.Game.Turn-1)%2] -= now - l.Game.LastMoveTime
 	l.Game.LastMoveTime = now
 
-	if l.Game.RemainingTime[(l.Game.Turn-1)%2] <= 0 || record.Surrender {
+	if l.Game.RemainingTime[(l.Game.Turn-1)%2] <= 0 || record.Resign {
 		l.Game.Playing = false
 		err := l.SyncGame(ctx)
 		if err != nil {
@@ -126,7 +126,7 @@ func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) e
 		}
 		l.ProcessGameResult(ctx, l.Game.Turn%2)
 		l.BroadcastTable(ctx)
-		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.Game.CoinToss[(l.Game.Turn+1)%2], " surrender"))
+		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.Game.CoinToss[(l.Game.Turn+1)%2], " resigned"))
 		return nil
 	}
 
@@ -197,7 +197,6 @@ func handler(ctx context.Context, req events.SQSEvent) {
 
 		l, err := ddb.GetGameTable(ctx, r.GameTableId)
 		if err != nil {
-			ddb.DeleteConnInPool(ctx, r.ConnectionId)
 			err = ws.DeleteWebSocket(ctx, r.ConnectionId)
 			if err != nil {
 				log.Print(err)

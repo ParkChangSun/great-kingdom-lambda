@@ -6,6 +6,7 @@ import (
 	"great-kingdom-lambda/lib/vars"
 	"great-kingdom-lambda/lib/ws"
 	"log"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -67,7 +68,7 @@ func GetGameTable(ctx context.Context, gameTableId string) (GameTableDDBItem, er
 		return GameTableDDBItem{}, err
 	}
 	if query.Item == nil {
-		return GameTableDDBItem{}, ErrItemNotFound
+		return GameTableDDBItem{}, &ItemNotFoundError{vars.GAME_TABLE_DYNAMODB, gameTableId}
 	}
 
 	l := GameTableDDBItem{}
@@ -122,7 +123,12 @@ func (l GameTableDDBItem) ProcessGameResult(ctx context.Context, winner int) err
 	win, _ := GetUser(ctx, l.Game.CoinToss[winner])
 	lose, _ := GetUser(ctx, l.Game.CoinToss[(winner+1)%2])
 
-	item := RecentGame{BlueId: l.Game.CoinToss[0], OrangeId: l.Game.CoinToss[1], WinnerId: l.Game.CoinToss[winner]}
+	item := RecentGame{
+		BlueId:      l.Game.CoinToss[0],
+		OrangeId:    l.Game.CoinToss[1],
+		WinnerId:    l.Game.CoinToss[winner],
+		CreatedDate: time.Now().Format(time.RFC3339),
+	}
 	win.RecentGames = append(win.RecentGames, item)
 	if len(win.RecentGames) > 10 {
 		win.RecentGames = win.RecentGames[1:]

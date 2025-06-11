@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"great-kingdom-lambda/lib/ddb"
 	"great-kingdom-lambda/lib/vars"
+	"great-kingdom-lambda/lib/ws"
 	"log"
 	"net/http"
 
@@ -13,17 +14,9 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
-	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	cfg, _ := config.LoadDefaultConfig(ctx)
-
 	data := struct{ Chat string }{}
 	json.Unmarshal([]byte(req.Body), &data)
 
@@ -32,41 +25,21 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	key := expression.KeyEqual(expression.Key("GameTableId"), expression.Value("globalchat"))
-	expr, _ := expression.NewBuilder().WithKeyCondition(key).Build()
-	out, err := dynamodb.NewFromConfig(cfg).Query(ctx, &dynamodb.QueryInput{
-		TableName:                 aws.String(vars.CONNECTION_DYNAMODB),
-		IndexName:                 aws.String("globalchat"),
-		KeyConditionExpression:    expr.KeyCondition(),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-	})
+	receivers, err := ddb.QueryGlobalChat(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	receivers := []ddb.ConnectionDDBItem{}
-	err = attributevalue.UnmarshalListOfMaps(out.Items, &receivers)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	c := ddb.GameTableBroadcastPayload{EventType: vars.CHATBROADCAST, Chat: strings.Join([]string{sender.UserId, ":", data.Chat}, " ")}
-
-	b, _ := json.Marshal(c)
-	wsClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
-		o.BaseEndpoint = aws.String(vars.WEBSOCKET_ENDPOINT)
-	})
 	for _, v := range receivers {
-		wsClient.PostToConnection(ctx, &apigatewaymanagementapi.PostToConnectionInput{
-			ConnectionId: aws.String(v.ConnectionId),
-			Data:         b,
+		ws.SendWebsocketMessage(ctx, v.ConnectionId, ddb.GameTableBroadcastPayload{
+			EventType: vars.CHATBROADCAST,
+			Chat:      strings.Join([]string{sender.UserId, ":", data.Chat}, " "),
 		})
 	}
 
 	d, _ := json.Marshal(struct {
 		Content string `json:"content"`
-	}{Content: c.Chat})
+	}{Content: strings.Join([]string{sender.UserId, ":", data.Chat}, " ")})
 	r, err := http.Post(vars.DISCORD_WEBHOOK, "application/json", bytes.NewBuffer(d))
 	if err != nil {
 		log.Print(err)

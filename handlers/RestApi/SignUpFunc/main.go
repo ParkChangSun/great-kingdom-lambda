@@ -17,8 +17,14 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	body := auth.Authenticate{}
 	json.Unmarshal([]byte(req.Body), &body)
 
-	_, err := ddb.GetUser(ctx, body.Id)
-	if !errors.Is(err, ddb.ErrItemNotFound) {
+	var INF *ddb.ItemNotFoundError
+	item, err := ddb.GetUser(ctx, body.Id)
+
+	if err != nil && !errors.As(err, &INF) {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
+	if item.UserId != "" {
 		b, _ := json.Marshal(auth.ErrorResponseBody{Message: "아이디 중복"})
 		return auth.RESTResponse(400, auth.CORSHeaders, string(b)), nil
 	}
