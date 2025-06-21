@@ -6,13 +6,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-type UserDDBItem struct {
-	UserId       string
+type User struct {
+	Id           string
 	PasswordHash string `json:"-"`
 	RefreshToken string `json:"-"`
 	W, L         int
@@ -20,82 +19,55 @@ type UserDDBItem struct {
 }
 
 type RecentGame struct {
-	BlueId, OrangeId, WinnerId string
-	CreatedDate                string
+	BlueId, OrangeId string
+	Result           string
+	CreatedDate      string
 }
 
-func UserDDBItemKey(userId string) map[string]types.AttributeValue {
-	k, _ := attributevalue.MarshalMap(struct{ UserId string }{UserId: userId})
+type UserRepository struct {
+	client *dynamodb.Client
+}
+
+func NewUserRepository() *UserRepository {
+	return &UserRepository{client: _client}
+}
+
+func UserKey(id string) map[string]types.AttributeValue {
+	k, _ := attributevalue.MarshalMap(struct{ Id string }{Id: id})
 	return k
 }
 
-func PutUser(ctx context.Context, id, pwh string) error {
-	data, _ := attributevalue.MarshalMap(UserDDBItem{
-		UserId:       id,
-		PasswordHash: pwh,
-		RefreshToken: "",
-		RecentGames:  []RecentGame{},
+func (r *UserRepository) Get(ctx context.Context, id string) (User, error) {
+	query, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(vars.USER_DYNAMODB),
+		Key:       UserKey(id),
 	})
-	_, err := client(ctx).PutItem(ctx, &dynamodb.PutItemInput{
+	if err != nil {
+		return User{}, err
+	}
+
+	if query.Item == nil {
+		return User{}, &ItemNotFoundError{vars.USER_DYNAMODB, id}
+	}
+
+	item := User{}
+	err = attributevalue.UnmarshalMap(query.Item, &item)
+	return item, err
+}
+
+func (r *UserRepository) Put(ctx context.Context, user User) error {
+	data, _ := attributevalue.MarshalMap(user)
+	_, err := r.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(vars.USER_DYNAMODB),
 		Item:      data,
 	})
 	return err
 }
 
-func GetUser(ctx context.Context, userId string) (UserDDBItem, error) {
-	query, err := client(ctx).GetItem(ctx, &dynamodb.GetItemInput{
+func (r *UserRepository) Delete(ctx context.Context, id string) error {
+	_, err := r.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(vars.USER_DYNAMODB),
-		Key:       UserDDBItemKey(userId),
-	})
-	if err != nil {
-		return UserDDBItem{}, err
-	}
-	if query.Item == nil {
-		return UserDDBItem{}, &ItemNotFoundError{vars.USER_DYNAMODB, userId}
-	}
-
-	item := UserDDBItem{}
-	err = attributevalue.UnmarshalMap(query.Item, &item)
-	return item, err
-}
-
-func (u UserDDBItem) SyncRecord(ctx context.Context) error {
-	update := expression.Set(
-		expression.Name("W"),
-		expression.Value(u.W),
-	).Set(
-		expression.Name("L"),
-		expression.Value(u.L),
-	).Set(
-		expression.Name("RecentGames"),
-		expression.Value(u.RecentGames),
-	)
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
-
-	_, err := client(ctx).UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(vars.USER_DYNAMODB),
-		Key:                       UserDDBItemKey(u.UserId),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-		UpdateExpression:          expr.Update(),
-	})
-	return err
-}
-
-func (u UserDDBItem) SyncRefreshToken(ctx context.Context) error {
-	update := expression.Set(
-		expression.Name("RefreshToken"),
-		expression.Value(u.RefreshToken),
-	)
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
-
-	_, err := client(ctx).UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(vars.USER_DYNAMODB),
-		Key:                       UserDDBItemKey(u.UserId),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-		UpdateExpression:          expr.Update(),
+		Key:       UserKey(id),
 	})
 	return err
 }

@@ -15,6 +15,8 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	userRepo := ddb.NewUserRepository()
+
 	cookie := req.Headers["cookie"]
 	if !strings.Contains(cookie, "GreatKingdomRefresh=") {
 		body, _ := json.Marshal(auth.AuthBody{Authorized: false, AccessToken: "", Id: ""})
@@ -28,7 +30,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	user, err := ddb.GetUser(ctx, refreshTokenClaims.Subject)
+	user, err := userRepo.Get(ctx, refreshTokenClaims.Subject)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
@@ -39,16 +41,16 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 			return events.APIGatewayProxyResponse{}, err
 		}
 		user.RefreshToken = r
-		err = user.SyncRefreshToken(ctx)
+		err = userRepo.Put(ctx, user)
 		if err != nil {
 			return events.APIGatewayProxyResponse{}, err
 		}
-		body, _ := json.Marshal(auth.AuthBody{Authorized: true, AccessToken: a, Id: user.UserId})
+		body, _ := json.Marshal(auth.AuthBody{Authorized: true, AccessToken: a, Id: user.Id})
 		return auth.RESTResponse(200, auth.AuthHeaders(r), string(body)), nil
 	}
 
 	user.RefreshToken = ""
-	err = user.SyncRefreshToken(ctx)
+	err = userRepo.Put(ctx, user)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	userItem, err := ddb.GetUser(ctx, req.QueryStringParameters["UserId"])
+	userItem, err := ddb.NewUserRepository().Get(ctx, req.QueryStringParameters["UserId"])
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

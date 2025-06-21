@@ -17,15 +17,15 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	conn, err := ddb.GetConnection(ctx, req.RequestContext.ConnectionID)
+	conn, err := ddb.NewConnectionRepository().Get(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
 	record := sqs.Record{
-		GameTableEvent:    e,
-		ConnectionDDBItem: conn,
-		Timestamp:         req.RequestContext.RequestTimeEpoch,
+		GameTableEvent: e,
+		Connection:     conn,
+		Timestamp:      req.RequestContext.RequestTimeEpoch,
 	}
 	err = sqs.SendToQueue(ctx, record, record.GameTableId)
 	if err != nil {

@@ -35,14 +35,13 @@ func SendToQueue(ctx context.Context, record Record, groupId string) error {
 }
 
 type GameTableEvent struct {
-	EventType vars.TABLEEVENTTYPE
-	Move      game.Point
-	Pass      bool
-	Resign    bool
+	EventType vars.CLIENTEVENTTYPE
+	game.Move
+	Resign bool
 }
 
 type Record struct {
 	GameTableEvent
-	ddb.ConnectionDDBItem
+	ddb.Connection
 	Timestamp int64
 }

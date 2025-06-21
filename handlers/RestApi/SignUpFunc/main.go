@@ -18,13 +18,13 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	json.Unmarshal([]byte(req.Body), &body)
 
 	var INF *ddb.ItemNotFoundError
-	item, err := ddb.GetUser(ctx, body.Id)
+	item, err := ddb.NewUserRepository().Get(ctx, body.Id)
 
 	if err != nil && !errors.As(err, &INF) {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	if item.UserId != "" {
+	if item.Id != "" {
 		b, _ := json.Marshal(auth.ErrorResponseBody{Message: "아이디 중복"})
 		return auth.RESTResponse(400, auth.CORSHeaders, string(b)), nil
 	}
@@ -44,7 +44,12 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
 
-	err = ddb.PutUser(ctx, body.Id, string(hash))
+	err = ddb.NewUserRepository().Put(ctx, ddb.User{
+		Id:           body.Id,
+		PasswordHash: string(hash),
+		RefreshToken: "logout",
+		RecentGames:  []ddb.RecentGame{},
+	})
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

@@ -20,18 +20,18 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	data := struct{ Chat string }{}
 	json.Unmarshal([]byte(req.Body), &data)
 
-	sender, err := ddb.GetConnection(ctx, req.RequestContext.ConnectionID)
+	sender, err := ddb.NewConnectionRepository().Get(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	receivers, err := ddb.QueryGlobalChat(ctx)
+	receivers, err := ddb.NewConnectionRepository().Query(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
 	for _, v := range receivers {
-		ws.SendWebsocketMessage(ctx, v.ConnectionId, ddb.GameTableBroadcastPayload{
+		ws.SendWebsocketMessage(ctx, v.Id, vars.WebsocketPayload{
 			EventType: vars.CHATBROADCAST,
 			Chat:      strings.Join([]string{sender.UserId, ":", data.Chat}, " "),
 		})

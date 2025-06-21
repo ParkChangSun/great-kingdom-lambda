@@ -12,13 +12,13 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	conn, err := ddb.DeleteConnInPool(ctx, req.RequestContext.ConnectionID)
+	conn, err := ddb.NewConnectionRepository().Delete(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
 	if conn.GameTableId == "globalchat" {
-		conns, err := ddb.QueryGlobalChat(ctx)
+		conns, err := ddb.NewConnectionRepository().Query(ctx)
 		if err != nil {
 			return events.APIGatewayProxyResponse{}, err
 		}
@@ -27,7 +27,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 			users = append(users, v.UserId)
 		}
 		for _, v := range conns {
-			ws.SendWebsocketMessage(ctx, v.ConnectionId, struct {
+			ws.SendWebsocketMessage(ctx, v.Id, struct {
 				EventType string
 				Users     []string
 			}{EventType: "USERS", Users: users})
@@ -36,9 +36,9 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	}
 
 	r := sqs.Record{
-		GameTableEvent:    sqs.GameTableEvent{EventType: vars.TABLELEAVEEVENT},
-		ConnectionDDBItem: conn,
-		Timestamp:         req.RequestContext.RequestTimeEpoch,
+		GameTableEvent: sqs.GameTableEvent{EventType: vars.TABLELEAVEEVENT},
+		Connection:     conn,
+		Timestamp:      req.RequestContext.RequestTimeEpoch,
 	}
 	err = sqs.SendToQueue(ctx, r, r.GameTableId)
 	if err != nil {

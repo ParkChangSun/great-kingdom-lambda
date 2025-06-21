@@ -18,17 +18,19 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	sugar := sugarlogger.GetSugar()
 	defer sugar.Sync()
 
+	connRepo := ddb.NewConnectionRepository()
+
 	msg := struct{ Authorization string }{}
 	json.Unmarshal([]byte(req.Body), &msg)
 
-	conn, err := ddb.GetConnection(ctx, req.RequestContext.ConnectionID)
+	conn, err := connRepo.Get(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
 	_, claims, err := auth.ParseToken(msg.Authorization)
 	if err != nil {
-		ws.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, ddb.GameTableBroadcastPayload{EventType: vars.AUTHBROADCAST, Auth: false})
+		ws.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, vars.WebsocketPayload{EventType: vars.AUTHBROADCAST, Auth: false})
 		ws.DeleteWebSocket(ctx, req.RequestContext.ConnectionID)
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
@@ -39,15 +41,15 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	}
 
 	conn.Authorized = true
-	err = conn.UpdateAuthorized(ctx)
+	err = connRepo.Put(ctx, conn)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	ws.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, ddb.GameTableBroadcastPayload{EventType: vars.AUTHBROADCAST, Auth: true})
+	ws.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, vars.WebsocketPayload{EventType: vars.AUTHBROADCAST, Auth: true})
 
 	if conn.GameTableId == "globalchat" {
-		conns, err := ddb.QueryGlobalChat(ctx)
+		conns, err := ddb.NewConnectionRepository().Query(ctx)
 		if err != nil {
 			return events.APIGatewayProxyResponse{}, err
 		}
@@ -56,7 +58,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 			users = append(users, v.UserId)
 		}
 		for _, v := range conns {
-			ws.SendWebsocketMessage(ctx, v.ConnectionId, struct {
+			ws.SendWebsocketMessage(ctx, v.Id, struct {
 				EventType string
 				Users     []string
 			}{EventType: "USERS", Users: users})
@@ -65,9 +67,9 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	}
 
 	r := sqs.Record{
-		GameTableEvent:    sqs.GameTableEvent{EventType: vars.TABLEJOINEVENT},
-		ConnectionDDBItem: conn,
-		Timestamp:         req.RequestContext.RequestTimeEpoch,
+		GameTableEvent: sqs.GameTableEvent{EventType: vars.TABLEJOINEVENT},
+		Connection:     conn,
+		Timestamp:      req.RequestContext.RequestTimeEpoch,
 	}
 	err = sqs.SendToQueue(ctx, r, r.GameTableId)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	items, err := ddb.ScanGameTable(ctx)
+	items, err := ddb.NewSessionRepository().Scan(ctx)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

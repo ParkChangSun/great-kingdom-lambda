@@ -12,13 +12,13 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	userItem, err := ddb.GetUser(ctx, req.RequestContext.Authorizer["UserId"].(string))
+	userItem, err := ddb.NewUserRepository().Get(ctx, req.RequestContext.Authorizer["UserId"].(string))
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
 	userItem.RefreshToken = ""
-	err = userItem.SyncRefreshToken(ctx)
+	err = ddb.NewUserRepository().Put(ctx, userItem)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

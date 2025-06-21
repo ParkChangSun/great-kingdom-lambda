@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	ACCESSEXPIRES  = time.Minute * 5
-	REFRESHEXPIRES = time.Hour
+	ACCESSEXPIRES  = time.Minute * 15
+	REFRESHEXPIRES = time.Hour * 24
 	EXPIRED        = time.Hour * -1
 )
 

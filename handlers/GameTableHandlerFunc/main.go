@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"great-kingdom-lambda/lib/ddb"
 	"great-kingdom-lambda/lib/sqs"
+	"great-kingdom-lambda/lib/sugarlogger"
 	"great-kingdom-lambda/lib/vars"
 	"great-kingdom-lambda/lib/ws"
-	"log"
 	"time"
 
 	"slices"
@@ -17,172 +17,152 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-func joinEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
-	if slices.ContainsFunc(l.Connections, func(c ddb.ConnectionDDBItem) bool { return c.UserId == record.UserId }) {
-		ddb.DeleteConnInPool(ctx, record.ConnectionId)
-		return ws.DeleteWebSocket(ctx, record.ConnectionId)
+func joinEvent(ctx context.Context, record sqs.Record, s ddb.GameSession) error {
+	sessionRepo := ddb.NewSessionRepository()
+
+	if slices.ContainsFunc(s.Connections, func(c ddb.Connection) bool { return c.UserId == record.UserId }) {
+		sessionRepo.Delete(ctx, record.Id)
+		return ws.DeleteWebSocket(ctx, record.Id)
 	}
 
-	l.Connections = append(l.Connections, record.ConnectionDDBItem)
-	if len(l.Players) < 2 {
-		l.Players = append(l.Players, record.UserId)
+	s.Connections = append(s.Connections, record.Connection)
+	if len(s.Players) < 2 {
+		s.Players = append(s.Players, &ddb.Player{Id: record.UserId})
 	}
 
-	err := l.SyncConnections(ctx)
+	err := sessionRepo.Put(ctx, s)
 	if err != nil {
 		return err
 	}
-
-	l.BroadcastTable(ctx)
-	l.BroadcastChat(ctx, fmt.Sprint(record.UserId, " has joined the game."))
+	s.Broadcast(ctx, fmt.Sprint(record.UserId, " has joined the game."))
 
 	return nil
 }
 
-func leaveEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
-	l.Connections = slices.DeleteFunc(l.Connections, func(u ddb.ConnectionDDBItem) bool { return u.UserId == record.UserId })
-	if len(l.Connections) == 0 {
-		return ddb.DeleteGameTable(ctx, l.GameTableId)
+func leaveEvent(ctx context.Context, record sqs.Record, s ddb.GameSession) error {
+	sessionRepo := ddb.NewSessionRepository()
+
+	s.Connections = slices.DeleteFunc(s.Connections, func(u ddb.Connection) bool { return u.UserId == record.UserId })
+	if len(s.Connections) == 0 {
+		return sessionRepo.Delete(ctx, s.Id)
 	}
 
-	l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == record.UserId })
-	if l.Game.Playing && len(l.Players) < 2 {
-		l.ProcessGameResult(ctx, slices.IndexFunc(l.Game.CoinToss, func(u string) bool { return u == l.Players[0] }))
-		l.BroadcastChat(ctx, fmt.Sprint(l.Players[0], " surrender."))
-
-		l.Game.Playing = false
-		err := l.SyncGame(ctx)
+	leaveIndex := slices.IndexFunc(s.Players, func(p *ddb.Player) bool { return p.Id == record.UserId })
+	if s.Playing() && leaveIndex != -1 {
+		s.GameTable.Result = record.UserId + " resign(leave)"
+		err := s.ProcessGameResult(ctx, (int(s.CoinToss)+leaveIndex+1)%2)
 		if err != nil {
 			return err
 		}
+		s.Players = slices.DeleteFunc(s.Players, func(u *ddb.Player) bool { return u.Id == record.UserId })
 	}
 
-	err := l.SyncConnections(ctx)
+	err := sessionRepo.Put(ctx, s)
 	if err != nil {
 		return err
 	}
-
-	l.BroadcastTable(ctx)
-	l.BroadcastChat(ctx, fmt.Sprint(record.UserId, " has left the game."))
+	s.Broadcast(ctx, fmt.Sprint(record.UserId, " has left the game."))
 
 	return nil
 }
 
-func slotEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
-	if l.Game.Playing {
-		return nil
-	}
+func slotEvent(ctx context.Context, record sqs.Record, s ddb.GameSession) error {
+	sessionRepo := ddb.NewSessionRepository()
 
-	if slices.ContainsFunc(l.Players, func(u string) bool { return u == record.UserId }) {
-		l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == record.UserId })
-	} else if len(l.Players) < 2 {
-		l.Players = append(l.Players, record.UserId)
+	if s.Playing() {
+		return nil
+	} else if slices.ContainsFunc(s.Players, func(u *ddb.Player) bool { return u.Id == record.UserId }) {
+		s.Players = slices.DeleteFunc(s.Players, func(u *ddb.Player) bool { return u.Id == record.UserId })
+	} else if len(s.Players) < 2 {
+		s.Players = append(s.Players, &ddb.Player{Id: record.UserId})
 	} else {
 		return nil
 	}
 
-	err := l.SyncConnections(ctx)
+	err := sessionRepo.Put(ctx, s)
 	if err != nil {
 		return err
 	}
-
-	l.BroadcastTable(ctx)
+	s.Broadcast(ctx, "")
 
 	return nil
 }
 
-func startEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
-	if record.UserId != l.Players[0] || l.Game.Playing || len(l.Players) != 2 {
+func startEvent(ctx context.Context, record sqs.Record, s ddb.GameSession) error {
+	sessionRepo := ddb.NewSessionRepository()
+
+	if record.UserId != s.Players[0].Id || s.Playing() || len(s.Players) != 2 {
 		return nil
 	}
 
-	l.Game.StartNewGame(l.Players)
+	s.StartNewGame()
 
-	err := l.SyncGame(ctx)
+	err := sessionRepo.Put(ctx, s)
 	if err != nil {
 		return err
 	}
-
-	l.BroadcastTable(ctx)
-	l.BroadcastChat(ctx, fmt.Sprint("Game start. ", l.Game.CoinToss[0], " plays first."))
+	s.Broadcast(ctx, fmt.Sprint("Game start. ", s.CurrentTurnPlayer().Id, " plays first."))
 
 	return nil
 }
 
-func gameEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
-	if !l.Game.Playing || l.Game.CoinToss[(l.Game.Turn-1)%2] != record.UserId {
+func gameEvent(ctx context.Context, record sqs.Record, s ddb.GameSession) error {
+	sessionRepo := ddb.NewSessionRepository()
+
+	if !s.Playing() || s.CurrentTurnPlayer().Id != record.UserId {
 		return nil
 	}
 
 	now := time.Now().UnixMilli()
-	l.Game.RemainingTime[(l.Game.Turn-1)%2] -= now - l.Game.LastMoveTime
-	l.Game.LastMoveTime = now
+	s.CurrentTurnPlayer().RemainingTime -= now - s.LastMoveTime
+	s.LastMoveTime = now
 
-	if l.Game.RemainingTime[(l.Game.Turn-1)%2] <= 0 || record.Resign {
-		l.Game.Playing = false
-		err := l.SyncGame(ctx)
+	if s.CurrentTurnPlayer().RemainingTime <= 0 || record.Resign {
+		s.GameTable.Result = fmt.Sprint(s.CurrentTurnPlayer().Id, " resign")
+		err := s.ProcessGameResult(ctx, (s.GameTable.Turn+int(s.CoinToss))%2)
 		if err != nil {
 			return err
 		}
-		l.ProcessGameResult(ctx, l.Game.Turn%2)
-		l.BroadcastTable(ctx)
-		l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.Game.CoinToss[(l.Game.Turn+1)%2], " resigned"))
-		return nil
-	}
 
-	if record.Pass {
-		l.Game.Pass()
-	} else if l.Game.CellPlayable(record.Move) {
-		l.Game.Move(record.Move)
-	} else {
-		return nil
-	}
-
-	if !l.Game.Playing {
-		b, o, sieged, w := l.Game.CountTerritory()
-		l.ProcessGameResult(ctx, w)
-		if sieged {
-			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", l.Game.CoinToss[w], " sieged its opponent."))
-		} else {
-			l.BroadcastChat(ctx, fmt.Sprint("Game over. ", b, " : ", o, "(+2.5)", " ", l.Game.CoinToss[w], " won."))
+		err = sessionRepo.Put(ctx, s)
+		if err != nil {
+			return err
 		}
+		s.Broadcast(ctx, fmt.Sprint("Game over. ", s.CurrentTurnPlayer().Id, " resign"))
+
+		return nil
 	}
 
-	err := l.SyncGame(ctx)
+	if !s.GameTable.Playable(record.Move) {
+		return nil
+	}
+	winner := s.GameTable.MakeMove(record.Move)
+	if winner != -1 {
+		err := s.ProcessGameResult(ctx, int(s.CoinToss)%2)
+		if err != nil {
+			return err
+		}
+		s.Broadcast(ctx, s.GameTable.Result)
+	}
+
+	err := sessionRepo.Put(ctx, s)
 	if err != nil {
 		return err
 	}
-
-	l.BroadcastTable(ctx)
+	s.Broadcast(ctx, "")
 
 	return nil
 }
 
-func kickEvent(ctx context.Context, record sqs.Record, l ddb.GameTableDDBItem) error {
-	if !l.Game.Playing || l.Game.CoinToss[l.Game.Turn%2] != record.UserId || l.Game.RemainingTime[(l.Game.Turn+1)%2] > time.Now().UnixMilli()-l.Game.LastMoveTime {
+func kickEvent(ctx context.Context, record sqs.Record, s ddb.GameSession) error {
+	if !s.Playing() || s.CurrentTurnPlayer().RemainingTime > time.Now().UnixMilli()-s.LastMoveTime {
 		return nil
 	}
 
-	l.Game.Playing = false
-	l.ProcessGameResult(ctx, l.Game.Turn%2)
-	err := l.SyncGame(ctx)
-	if err != nil {
-		return err
-	}
-
-	kickedId := l.Game.CoinToss[(l.Game.Turn+1)%2]
-	l.Players = slices.DeleteFunc(l.Players, func(u string) bool { return u == kickedId })
-	i := slices.IndexFunc(l.Connections, func(u ddb.ConnectionDDBItem) bool { return u.UserId == kickedId })
-	err = ws.DeleteWebSocket(ctx, l.Connections[i].ConnectionId)
-	if err != nil {
-		return err
-	}
-	l.Connections = slices.Delete(l.Connections, i, i+1)
-
-	l.SyncConnections(ctx)
-
-	l.BroadcastChat(ctx, fmt.Sprint(l.Game.CoinToss[(l.Game.Turn+1)%2], " timeout"))
-	l.BroadcastTable(ctx)
+	kickedIndex := slices.IndexFunc(s.Connections, func(u ddb.Connection) bool { return u.UserId == s.CurrentTurnPlayer().Id })
+	s.Broadcast(ctx, fmt.Sprint(s.CurrentTurnPlayer().Id, " kicked(timeout)"))
+	ws.DeleteWebSocket(ctx, s.Connections[kickedIndex].Id)
+	// trigger leave event
 
 	return nil
 }
@@ -195,12 +175,13 @@ func handler(ctx context.Context, req events.SQSEvent) {
 			continue
 		}
 
-		l, err := ddb.GetGameTable(ctx, r.GameTableId)
+		sugar := sugarlogger.GetSugar()
+
+		sessionRepo := ddb.NewSessionRepository()
+		l, err := sessionRepo.Get(ctx, r.GameTableId)
 		if err != nil {
-			err = ws.DeleteWebSocket(ctx, r.ConnectionId)
-			if err != nil {
-				log.Print(err)
-			}
+			sugar.Warn(err)
+			ws.DeleteWebSocket(ctx, r.Id)
 			continue
 		}
 
@@ -225,8 +206,7 @@ func handler(ctx context.Context, req events.SQSEvent) {
 		}
 
 		if err != nil {
-			log.Print(err)
-			l.BroadcastChat(ctx, err.Error())
+			sugar.Warn(err)
 			continue
 		}
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"great-kingdom-lambda/lib/auth"
-	"log"
+	"great-kingdom-lambda/lib/sugarlogger"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -28,12 +28,14 @@ func generatePolicy(principalID, effect, resource string, context map[string]any
 }
 
 func handler(ctx context.Context, req events.APIGatewayCustomAuthorizerRequestTypeRequest) (events.APIGatewayCustomAuthorizerResponse, error) {
+	sugar := sugarlogger.GetSugar()
+	defer sugar.Sync()
+
 	resource := fmt.Sprintf("arn:aws:execute-api:*:%s:%s/*", req.RequestContext.AccountID, req.RequestContext.APIID)
 
 	_, claims, err := auth.ParseToken(req.Headers["authorization"])
 	if err != nil {
-		log.Print(req.Headers)
-		log.Print(err)
+		sugar.Error(err)
 		return generatePolicy(claims.Subject, "Deny", resource, nil), nil
 	}
 

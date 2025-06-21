@@ -10,12 +10,12 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	err := ddb.PutConnInPool(ctx, ddb.ConnectionDDBItem{
-		ConnectionId: req.RequestContext.ConnectionID,
-		GameTableId:  req.QueryStringParameters["GameTableId"],
-		UserId:       req.QueryStringParameters["UserId"],
-		CreatedDate:  time.Now().Format(time.RFC3339),
-		Authorized:   false,
+	err := ddb.NewConnectionRepository().Put(ctx, ddb.Connection{
+		Id:          req.RequestContext.ConnectionID,
+		GameTableId: req.QueryStringParameters["GameTableId"],
+		UserId:      req.QueryStringParameters["UserId"],
+		CreatedDate: time.Now().Format(time.RFC3339),
+		Authorized:  false,
 	})
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err

@@ -4,10 +4,16 @@ import (
 	"os"
 )
 
-type TABLEEVENTTYPE int
+type WebsocketPayload struct {
+	EventType string
+	Chat      string
+	Auth      bool
+}
+
+type CLIENTEVENTTYPE int
 
 const (
-	TABLEJOINEVENT TABLEEVENTTYPE = iota
+	TABLEJOINEVENT CLIENTEVENTTYPE = iota
 	TABLELEAVEEVENT
 	TABLESTARTEVENT
 	TABLEMOVEEVENT
@@ -23,7 +29,7 @@ const (
 )
 
 var (
-	GAME_TABLE_DYNAMODB    = os.Getenv("GAME_TABLE_DYNAMODB")
+	GAME_SESSION_DYNAMODB  = os.Getenv("GAME_SESSION_DYNAMODB")
 	USER_DYNAMODB          = os.Getenv("USER_DYNAMODB")
 	CONNECTION_DYNAMODB    = os.Getenv("CONNECTION_DYNAMODB")
 	GAME_TABLE_EVENT_QUEUE = os.Getenv("GAME_TABLE_EVENT_QUEUE")

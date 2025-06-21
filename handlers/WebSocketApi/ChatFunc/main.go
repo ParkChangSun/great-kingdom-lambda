@@ -20,17 +20,17 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{}, nil
 	}
 
-	conn, err := ddb.GetConnection(ctx, req.RequestContext.ConnectionID)
+	conn, err := ddb.NewConnectionRepository().Get(ctx, req.RequestContext.ConnectionID)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	l, err := ddb.GetGameTable(ctx, conn.GameTableId)
+	l, err := ddb.NewSessionRepository().Get(ctx, conn.GameTableId)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	l.BroadcastChat(ctx, fmt.Sprint(conn.UserId, " : ", msg))
+	l.Broadcast(ctx, fmt.Sprint(conn.UserId, " : ", msg))
 
 	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 }

@@ -27,7 +27,7 @@ Globals:
     CodeUri: .
     Environment:
       Variables:
-        GAME_TABLE_DYNAMODB: !Ref GameTableDynamoDB
+        GAME_SESSION_DYNAMODB: !Ref GameSessionDynamoDB
         USER_DYNAMODB: !Ref UserDynamoDB
         CONNECTION_DYNAMODB: !Ref WebSocketConnectionDynamoDB
         GAME_TABLE_EVENT_QUEUE: !Ref GameTableEventQueue
@@ -80,7 +80,7 @@ Resources:
     Properties:
       Policies:
         - DynamoDBCrudPolicy: 
-            TableName: !Ref GameTableDynamoDB
+            TableName: !Ref GameSessionDynamoDB
       Events:
         RestPOST:
           Type: Api
@@ -98,7 +98,7 @@ Resources:
     Properties:
       Policies:
         - DynamoDBCrudPolicy: 
-            TableName: !Ref GameTableDynamoDB
+            TableName: !Ref GameSessionDynamoDB
       Events:
         RestGET:
           Type: Api
@@ -360,7 +360,7 @@ Resources:
         - DynamoDBCrudPolicy: 
             TableName: !Ref WebSocketConnectionDynamoDB
         - DynamoDBCrudPolicy: 
-            TableName: !Ref GameTableDynamoDB
+            TableName: !Ref GameSessionDynamoDB
         - AmazonAPIGatewayInvokeFullAccess
 
   ChatPermission:
@@ -461,7 +461,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref WebSocketConnectionDynamoDB
         - DynamoDBCrudPolicy:
-            TableName: !Ref GameTableDynamoDB
+            TableName: !Ref GameSessionDynamoDB
         - DynamoDBCrudPolicy:
             TableName: !Ref UserDynamoDB
         - AmazonAPIGatewayInvokeFullAccess
@@ -476,32 +476,32 @@ Resources:
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: ConnectionId
+        - AttributeName: Id
           AttributeType: "S"
         - AttributeName: GameTableId
           AttributeType: S
       KeySchema:
-        - AttributeName: ConnectionId
+        - AttributeName: Id
           KeyType: "HASH"
       GlobalSecondaryIndexes:
         - IndexName: globalchat
           KeySchema:
             - AttributeName: GameTableId
               KeyType: HASH
-            - AttributeName: ConnectionId
+            - AttributeName: Id
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
 
-  GameTableDynamoDB:
+  GameSessionDynamoDB:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: GameTableId
+        - AttributeName: Id
           AttributeType: "S"
       KeySchema:
-        - AttributeName: GameTableId
+        - AttributeName: Id
           KeyType: "HASH"
 
   UserDynamoDB:
@@ -509,10 +509,10 @@ Resources:
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: UserId
+        - AttributeName: Id
           AttributeType: "S"
       KeySchema:
-        - AttributeName: UserId
+        - AttributeName: Id
           KeyType: "HASH"
 
 # Outputs:

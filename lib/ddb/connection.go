@@ -8,20 +8,52 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-type ConnectionDDBItem struct {
-	ConnectionId string
-	UserId       string
-	GameTableId  string
-	CreatedDate  string
-	Authorized   bool
+type Connection struct {
+	Id          string
+	UserId      string
+	GameTableId string
+	CreatedDate string
+	Authorized  bool
 }
 
-func PutConnInPool(ctx context.Context, conn ConnectionDDBItem) error {
+type ConnectionRepository struct {
+	client *dynamodb.Client
+}
+
+func NewConnectionRepository() *ConnectionRepository {
+	return &ConnectionRepository{client: _client}
+}
+
+func ConnectionKey(id string) map[string]types.AttributeValue {
+	k, _ := attributevalue.MarshalMap(struct{ Id string }{Id: id})
+	return k
+}
+
+func (r *ConnectionRepository) Get(ctx context.Context, id string) (Connection, error) {
+	query, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(vars.CONNECTION_DYNAMODB),
+		Key:       ConnectionKey(id),
+	})
+	if err != nil {
+		return Connection{}, err
+	}
+
+	if query.Item == nil {
+		return Connection{}, &ItemNotFoundError{vars.CONNECTION_DYNAMODB, id}
+	}
+
+	item := Connection{}
+	attributevalue.UnmarshalMap(query.Item, &item)
+	return item, nil
+}
+
+func (r *ConnectionRepository) Put(ctx context.Context, conn Connection) error {
 	item, _ := attributevalue.MarshalMap(conn)
 
-	_, err := client(ctx).PutItem(ctx, &dynamodb.PutItemInput{
+	_, err := r.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(vars.CONNECTION_DYNAMODB),
 		Item:      item,
 	})
@@ -29,79 +61,25 @@ func PutConnInPool(ctx context.Context, conn ConnectionDDBItem) error {
 	return err
 }
 
-func DeleteConnInPool(ctx context.Context, connId string) (ConnectionDDBItem, error) {
-	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{connId})
-
-	out, err := client(ctx).DeleteItem(ctx, &dynamodb.DeleteItemInput{
+func (r *ConnectionRepository) Delete(ctx context.Context, id string) (Connection, error) {
+	out, err := r.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName:    aws.String(vars.CONNECTION_DYNAMODB),
-		Key:          key,
+		Key:          ConnectionKey(id),
 		ReturnValues: "ALL_OLD",
 	})
 	if err != nil {
-		return ConnectionDDBItem{}, err
+		return Connection{}, err
 	}
 
-	item := ConnectionDDBItem{}
+	item := Connection{}
 	err = attributevalue.UnmarshalMap(out.Attributes, &item)
 	return item, err
 }
 
-func GetConnection(ctx context.Context, connectionId string) (ConnectionDDBItem, error) {
-	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{connectionId})
-	query, err := client(ctx).GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(vars.CONNECTION_DYNAMODB),
-		Key:       key,
-	})
-	if err != nil {
-		return ConnectionDDBItem{}, err
-	}
-	if query.Item == nil {
-		return ConnectionDDBItem{}, &ItemNotFoundError{vars.CONNECTION_DYNAMODB, connectionId}
-	}
-
-	record := ConnectionDDBItem{}
-	attributevalue.UnmarshalMap(query.Item, &record)
-	return record, nil
-}
-
-func (c ConnectionDDBItem) UpdateUserId(ctx context.Context) error {
-	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{c.ConnectionId})
-	update := expression.Set(
-		expression.Name("UserId"),
-		expression.Value(c.UserId),
-	)
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
-	_, err := client(ctx).UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(vars.CONNECTION_DYNAMODB),
-		Key:                       key,
-		UpdateExpression:          expr.Update(),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-	})
-	return err
-}
-
-func (c ConnectionDDBItem) UpdateAuthorized(ctx context.Context) error {
-	key, _ := attributevalue.MarshalMap(struct{ ConnectionId string }{c.ConnectionId})
-	update := expression.Set(
-		expression.Name("Authorized"),
-		expression.Value(c.Authorized),
-	)
-	expr, _ := expression.NewBuilder().WithUpdate(update).Build()
-	_, err := client(ctx).UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(vars.CONNECTION_DYNAMODB),
-		Key:                       key,
-		UpdateExpression:          expr.Update(),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-	})
-	return err
-}
-
-func QueryGlobalChat(ctx context.Context) ([]ConnectionDDBItem, error) {
+func (r *ConnectionRepository) Query(ctx context.Context) ([]Connection, error) {
 	key := expression.KeyEqual(expression.Key("GameTableId"), expression.Value("globalchat"))
 	expr, _ := expression.NewBuilder().WithKeyCondition(key).Build()
-	q, err := client(ctx).Query(ctx, &dynamodb.QueryInput{
+	q, err := r.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:                 aws.String(vars.CONNECTION_DYNAMODB),
 		IndexName:                 aws.String("globalchat"),
 		KeyConditionExpression:    expr.KeyCondition(),
@@ -112,10 +90,7 @@ func QueryGlobalChat(ctx context.Context) ([]ConnectionDDBItem, error) {
 		return nil, err
 	}
 
-	out := []ConnectionDDBItem{}
-	err = attributevalue.UnmarshalListOfMaps(q.Items, &out)
-	if err != nil {
-		return nil, err
-	}
+	out := []Connection{}
+	attributevalue.UnmarshalListOfMaps(q.Items, &out)
 	return out, nil
 }

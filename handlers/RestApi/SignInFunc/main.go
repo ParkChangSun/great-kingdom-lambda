@@ -15,7 +15,7 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	reqBody := auth.Authenticate{}
 	json.Unmarshal([]byte(req.Body), &reqBody)
 
-	user, err := ddb.GetUser(ctx, reqBody.Id)
+	user, err := ddb.NewUserRepository().Get(ctx, reqBody.Id)
 	if err != nil {
 		b, _ := json.Marshal(auth.ErrorResponseBody{Message: "login failed"})
 		return auth.RESTResponse(400, auth.CORSHeaders, string(b)), nil
@@ -33,12 +33,12 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 
 	user.RefreshToken = r
-	err = user.SyncRefreshToken(ctx)
+	err = ddb.NewUserRepository().Put(ctx, user)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 
-	resBody, _ := json.Marshal(auth.AuthBody{Authorized: true, AccessToken: a, Id: user.UserId})
+	resBody, _ := json.Marshal(auth.AuthBody{Authorized: true, AccessToken: a, Id: user.Id})
 	return auth.RESTResponse(200, auth.AuthHeaders(r), string(resBody)), nil
 }
 

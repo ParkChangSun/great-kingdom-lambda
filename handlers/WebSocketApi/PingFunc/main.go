@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"great-kingdom-lambda/lib/ddb"
 	"great-kingdom-lambda/lib/vars"
 	"great-kingdom-lambda/lib/ws"
 
@@ -11,7 +10,7 @@ import (
 )
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	ws.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, ddb.GameTableBroadcastPayload{EventType: vars.PONGBROADCAST})
+	ws.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, vars.WebsocketPayload{EventType: vars.PONGBROADCAST})
 	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 }
 
