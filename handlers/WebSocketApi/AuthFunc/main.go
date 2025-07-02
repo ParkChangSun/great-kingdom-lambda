@@ -23,16 +23,16 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	msg := struct{ Authorization string }{}
 	json.Unmarshal([]byte(req.Body), &msg)
 
-	conn, err := connRepo.Get(ctx, req.RequestContext.ConnectionID)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
 	_, claims, err := auth.ParseToken(msg.Authorization)
 	if err != nil {
 		ws.SendWebsocketMessage(ctx, req.RequestContext.ConnectionID, vars.WebsocketPayload{EventType: vars.AUTHBROADCAST, Auth: false})
 		ws.DeleteWebSocket(ctx, req.RequestContext.ConnectionID)
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
+	}
+
+	conn, err := connRepo.Get(ctx, req.RequestContext.ConnectionID)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
 	}
 
 	if conn.UserId != claims.Subject {

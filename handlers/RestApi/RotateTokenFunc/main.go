@@ -27,12 +27,23 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	refreshToken, refreshTokenClaims, err := auth.ParseToken(refreshTokenStr)
 
 	if err != nil && !errors.Is(err, jwt.ErrTokenExpired) {
+		// 만료되면 어떻게?
 		return events.APIGatewayProxyResponse{}, err
 	}
 
 	user, err := userRepo.Get(ctx, refreshTokenClaims.Subject)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
+	}
+
+	if user.RefreshToken != refreshTokenStr {
+		user.RefreshToken = ""
+		err = userRepo.Put(ctx, user)
+		if err != nil {
+			return events.APIGatewayProxyResponse{}, err
+		}
+		body, _ := json.Marshal(auth.AuthBody{Authorized: false, AccessToken: "", Id: ""})
+		return auth.RESTResponse(200, auth.AuthHeaders(""), string(body)), nil
 	}
 
 	if refreshToken.Valid {

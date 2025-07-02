@@ -1,21 +1,19 @@
-커밋한사항
-b1
-ui변경
-
-
 언젠가 확인
 게임테이블아이디 없을때 웹소켓/ddb삭제되는지
-모든사람이 킥할수있고 제대로 커넥션 제거 및 라우트 트리거되는지
 
 
 확인해야할 변경점
+유저 삭제
+모든사람이 킥할수있고 제대로 커넥션 제거 및 라우트 트리거되는지
+레코드 더보기 잘 작동하는지
 
 
 todo
-레이아웃에서 요청 넣어서 토큰로테이션 하면 로그인 내프로필 버튼 구현 가능?
-최근리프레시타임 토큰에서 꺼낸 유저아이디로 디비에 있는 그 유저의 리프레시토큰과 같은지 비교
-로테이션 웹소켓인증 함수 로직 확인
-auth보낼때 그냥 {auth} 아니면 그냥 안보내기 인증실패하면 끊기기?
+턴 관련한거 다 갈아엎어 게임 로직도...?
+그리고 0 1 이런거도 변수화해야할듯 bluewin이런걸로
+포인트를 셀로 바꾸기 이름만
+나갔는데 왜 이벤트가 안오는거같지
+두면 안되는곳
 
 
 부가 목표
@@ -23,30 +21,39 @@ auth문제되는경우
 방에 들어갈때 토큰이 만료되었다면
 그냥 웹페이지에서 막 authrefresh같은거 자동으로 하는 대신 팝업 같은거 사용해서 수동으로 하기
 토큰로테이션 만료시간 적어놓고 브라우저에서 그 시간이 되면 자동으로 리프레시?
-메인로비 테이블 버튼 좀 고쳐봐
 prod dev 분리
 - 프론트는 dev 도메인을 등록하고 cloudfront 및 s3를 새로 만들어 배포한다.
 - 서버는 람다 빌드에 스테이지 이름으로 로직을 구분한다.
-svelte템플릿 제너레이터에 유닛테스트 브라우저테스트 i18n 다있다
-채팅 저장 게시판 xss csrf방어
-언어 설정
-arm64 / httpapi / role / s3 / ssm parameter store / application / cloudformation / ddb provisioning / aurora serverless
-프론트 s3 cloudformation 템플릿
+채팅 저장
+게시판 xss csrf방어 오리진 확인
+arm64 / httpapi / role / s3 / ssm parameter store / application / cloudformation / ddb provisioning&data modeling
+s3 cloudformation / serviceworker / svelte docs cli에 툴 많음
 이메일 인증 필요
-사용자의 모든 기보 목록 더보기 방식
 마우스 올리면 유저 정보
 레이팅 및 랭크매치
-랭크만 저장하기?
+데이터 /etc 에 보관하는 방식으로 부하 줄이기?
 
 
 문제
 방에 혼자있을때 새고로침
 2시간 지나면 연결해제됨
+메인로비 커넥션 문제
 
 
-생각
-커넥트랑 유저 게임테이블 안이랑 데이터베이스에 둘다 넣어야함? 하나만넣을순없나 - 귀찮으니까 걍 둬
 ddb ttl
+
+🔸 여러 기기(브라우저/앱 등) 로그인 지원하는 경우
+테이블 구조 예시:
+
+PK (userId)	SK (sessionId)	refreshToken	userAgent	updatedAt
+123	session-abc123	xxx.yyy.zzz	Chrome	1721613800
+123	session-def456	aaa.bbb.ccc	Safari	1721610000
+
+sessionId는 UUID로 생성
+
+클라이언트는 쿠키에 sessionId와 refreshToken을 함께 보냄
+
+RTR 시 해당 세션의 RT만 검증하고 교체
 
 
 테스트

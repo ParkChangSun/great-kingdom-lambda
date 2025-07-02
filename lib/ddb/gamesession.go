@@ -47,7 +47,7 @@ func (s GameSession) Playing() bool {
 }
 
 func (s GameSession) CurrentTurnPlayer() *Player {
-	return s.Players[(s.GameTable.Turn+int(s.CoinToss)+1)%2]
+	return s.Players[(len(s.GameTable.Record)+int(s.CoinToss))%2]
 }
 
 type GameSessionBroadcastPayload struct {

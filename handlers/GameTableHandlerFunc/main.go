@@ -49,13 +49,43 @@ func leaveEvent(ctx context.Context, record sqs.Record, s ddb.GameSession) error
 
 	leaveIndex := slices.IndexFunc(s.Players, func(p *ddb.Player) bool { return p.Id == record.UserId })
 	if s.Playing() && leaveIndex != -1 {
-		s.GameTable.Result = record.UserId + " resign(leave)"
+		if s.CoinToss%2 == 1 {
+			if leaveIndex == 0 {
+				s.GameTable.Result = "blue resign(leave)"
+			} else {
+				s.GameTable.Result = "orange resign(leave)"
+			}
+		} else {
+			if leaveIndex == 0 {
+				s.GameTable.Result = "orange resign(leave)"
+			} else {
+				s.GameTable.Result = "blue resign(leave)"
+			}
+		}
 		err := s.ProcessGameResult(ctx, (int(s.CoinToss)+leaveIndex+1)%2)
 		if err != nil {
 			return err
 		}
-		s.Players = slices.DeleteFunc(s.Players, func(u *ddb.Player) bool { return u.Id == record.UserId })
+
+		ids := []string{s.Players[0].Id, s.Players[1].Id}
+		if s.CoinToss%2 == 1 {
+			slices.Reverse(ids)
+		}
+		ddb.NewRecordRepository().Put(ctx, ddb.Record{
+			PlayerId:  s.Players[0].Id,
+			Time:      time.Now().Format(time.RFC3339),
+			PlayersId: ids,
+			GameTable: *s.GameTable,
+		})
+		ddb.NewRecordRepository().Put(ctx, ddb.Record{
+			PlayerId:  s.Players[1].Id,
+			Time:      time.Now().Format(time.RFC3339),
+			PlayersId: ids,
+			GameTable: *s.GameTable,
+		})
 	}
+
+	s.Players = slices.DeleteFunc(s.Players, func(u *ddb.Player) bool { return u.Id == record.UserId })
 
 	err := sessionRepo.Put(ctx, s)
 	if err != nil {
@@ -113,31 +143,76 @@ func gameEvent(ctx context.Context, record sqs.Record, s ddb.GameSession) error 
 		return nil
 	}
 
+	if !record.Resign && !s.GameTable.Playable(record.Move) {
+		return nil
+	}
+
 	now := time.Now().UnixMilli()
 	s.CurrentTurnPlayer().RemainingTime -= now - s.LastMoveTime
 	s.LastMoveTime = now
 
 	if s.CurrentTurnPlayer().RemainingTime <= 0 || record.Resign {
-		s.GameTable.Result = fmt.Sprint(s.CurrentTurnPlayer().Id, " resign")
-		err := s.ProcessGameResult(ctx, (s.GameTable.Turn+int(s.CoinToss))%2)
+		color := ""
+		if len(s.GameTable.Record)%2 == 0 {
+			color = "blue"
+		} else {
+			color = "orange"
+		}
+		s.GameTable.Result = fmt.Sprint(color, " resign")
+
+		err := s.ProcessGameResult(ctx, (len(s.GameTable.Record)+int(s.CoinToss))%2)
 		if err != nil {
 			return err
 		}
+
+		ids := []string{s.Players[0].Id, s.Players[1].Id}
+		if s.CoinToss%2 == 1 {
+			slices.Reverse(ids)
+		}
+
+		ddb.NewRecordRepository().Put(ctx, ddb.Record{
+			PlayerId:  s.Players[0].Id,
+			Time:      time.Now().Format(time.RFC3339),
+			PlayersId: ids,
+			GameTable: *s.GameTable,
+		})
+		ddb.NewRecordRepository().Put(ctx, ddb.Record{
+			PlayerId:  s.Players[1].Id,
+			Time:      time.Now().Format(time.RFC3339),
+			PlayersId: ids,
+			GameTable: *s.GameTable,
+		})
+		sugarlogger.GetSugar().Info("game finish ", s.GameTable.Result)
 
 		err = sessionRepo.Put(ctx, s)
 		if err != nil {
 			return err
 		}
-		s.Broadcast(ctx, fmt.Sprint("Game over. ", s.CurrentTurnPlayer().Id, " resign"))
+		s.Broadcast(ctx, s.GameTable.Result)
 
 		return nil
 	}
 
-	if !s.GameTable.Playable(record.Move) {
-		return nil
-	}
 	winner := s.GameTable.MakeMove(record.Move)
 	if winner != -1 {
+		ids := []string{s.Players[0].Id, s.Players[1].Id}
+		if s.CoinToss%2 == 1 {
+			slices.Reverse(ids)
+		}
+		ddb.NewRecordRepository().Put(ctx, ddb.Record{
+			PlayerId:  s.Players[0].Id,
+			Time:      time.Now().Format(time.RFC3339),
+			PlayersId: ids,
+			GameTable: *s.GameTable,
+		})
+		ddb.NewRecordRepository().Put(ctx, ddb.Record{
+			PlayerId:  s.Players[1].Id,
+			Time:      time.Now().Format(time.RFC3339),
+			PlayersId: ids,
+			GameTable: *s.GameTable,
+		})
+		sugarlogger.GetSugar().Info("game finish ", s.GameTable.Result)
+
 		err := s.ProcessGameResult(ctx, int(s.CoinToss)%2)
 		if err != nil {
 			return err

@@ -35,6 +35,7 @@ Globals:
         WEBSOCKET_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${WebSocketApiProdStage}"
         JWT_SIGNING_KEY: !Ref JWTSigningKey
         DISCORD_WEBHOOK: !Ref DiscordWebhook
+        RECORD_DYNAMODB: !Ref RecordDynamoDB
 
 Resources:
   RestAuthorizerFunc:
@@ -123,6 +124,42 @@ Resources:
           Properties:
             RestApiId: !Ref RestApi
             Path: /user
+            Method: GET
+            Auth:
+              Authorizer: LambdaAuthorizer
+
+  DeleteUserFunc:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref UserDynamoDB
+      Events:
+        RestGET:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestApi
+            Path: /user
+            Method: DELETE
+            Auth:
+              Authorizer: LambdaAuthorizer
+
+  GetRecordsFunc:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Policies:
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref RecordDynamoDB
+      Events:
+        RestGET:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestApi
+            Path: /records
             Method: GET
             Auth:
               Authorizer: LambdaAuthorizer
@@ -464,6 +501,8 @@ Resources:
             TableName: !Ref GameSessionDynamoDB
         - DynamoDBCrudPolicy:
             TableName: !Ref UserDynamoDB
+        - DynamoDBCrudPolicy: 
+            TableName: !Ref RecordDynamoDB
         - AmazonAPIGatewayInvokeFullAccess
       Events:
         GameTableEventQueue:
@@ -514,6 +553,21 @@ Resources:
       KeySchema:
         - AttributeName: Id
           KeyType: "HASH"
+
+  RecordDynamoDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PlayerId
+          AttributeType: "S"
+        - AttributeName: Time
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: PlayerId
+          KeyType: "HASH"
+        - AttributeName: Time
+          KeyType: "RANGE"
 
 # Outputs:
 #   api:

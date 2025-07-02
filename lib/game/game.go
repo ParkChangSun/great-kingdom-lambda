@@ -2,32 +2,6 @@ package game
 
 import "fmt"
 
-type Point struct {
-	R, C int
-}
-
-type Move struct {
-	Point Point
-	Pass  bool
-}
-
-// turn도 레코드 길이로 할수있는데?
-type GameTable struct {
-	Turn   int
-	Board  [9][9]CellStatus
-	Record []Move
-	Result string
-}
-
-func NewGameTable() *GameTable {
-	g := &GameTable{
-		Turn:   1,
-		Record: []Move{},
-	}
-	g.Board[4][4] = NEUTRALCASTLE
-	return g
-}
-
 type CellStatus int
 
 const (
@@ -43,8 +17,31 @@ const (
 
 const TERRITORYOFFSET = 2
 
+type Point struct {
+	R, C int
+}
+
 func (p Point) getNeighbors() []Point {
 	return []Point{{p.R, p.C - 1}, {p.R, p.C + 1}, {p.R - 1, p.C}, {p.R + 1, p.C}}
+}
+
+type Move struct {
+	Point Point
+	Pass  bool
+}
+
+type GameTable struct {
+	Board  [9][9]CellStatus
+	Record []Move
+	Result string
+}
+
+func NewGameTable() *GameTable {
+	g := &GameTable{
+		Record: []Move{},
+	}
+	g.Board[4][4] = NEUTRALCASTLE
+	return g
 }
 
 func (g *GameTable) putPiece(p Point, s CellStatus) {
@@ -67,23 +64,24 @@ func (g GameTable) getCellStatus(p Point) (cell CellStatus, edge int) {
 	return g.Board[p.R][p.C], -1
 }
 
+// after record append
 func (g GameTable) getPlayerColor() (attacker CellStatus, defenser CellStatus) {
-	if g.Turn%2 == 1 {
-		return BLUECASTLE, ORANGECASTLE
-	} else {
+	if len(g.Record)%2 == 0 {
 		return ORANGECASTLE, BLUECASTLE
+	} else {
+		return BLUECASTLE, ORANGECASTLE
 	}
 }
 
 // given point is side of moved point
-func (g GameTable) checkSieged(defenserCell Point) map[Point]struct{} {
+func (g GameTable) checkSideSieged(side Point) map[Point]struct{} {
 	attackerColor, defenserColor := g.getPlayerColor()
-	if c, _ := g.getCellStatus(defenserCell); c != defenserColor {
+	if c, _ := g.getCellStatus(side); c != defenserColor {
 		return nil
 	}
 
 	checked := map[Point]struct{}{}
-	queue := []Point{defenserCell}
+	queue := []Point{side}
 	edgeCheck := [4]bool{}
 
 	for len(queue) > 0 {
@@ -115,14 +113,14 @@ func (g GameTable) checkSieged(defenserCell Point) map[Point]struct{} {
 	return checked
 }
 
-func (g GameTable) checkOccupied(defenserCell Point) map[Point]struct{} {
+func (g GameTable) checkSideOccupied(side Point) map[Point]struct{} {
 	attackerColor, _ := g.getPlayerColor()
-	if c, _ := g.getCellStatus(defenserCell); c != EMPTYLAND {
+	if c, _ := g.getCellStatus(side); c != EMPTYLAND {
 		return nil
 	}
 
 	checked := map[Point]struct{}{}
-	queue := []Point{defenserCell}
+	queue := []Point{side}
 	edgeCheck := [4]bool{}
 
 	for len(queue) > 0 {
@@ -159,7 +157,49 @@ func (g GameTable) Playable(m Move) bool {
 		return true
 	}
 	c, _ := g.getCellStatus(m.Point)
-	return c == EMPTYLAND
+	if c != EMPTYLAND {
+		return false
+	}
+
+	var attacker CellStatus
+	if len(g.Record)%2 == 0 {
+		attacker, _ = BLUECASTLE, ORANGECASTLE
+	} else {
+		attacker, _ = ORANGECASTLE, BLUECASTLE
+	}
+
+	g.putPiece(m.Point, attacker)
+	g.Record = append(g.Record, m)
+
+	for _, n := range m.Point.getNeighbors() {
+		if s := g.checkSideSieged(n); s != nil {
+			return true
+		}
+	}
+
+	checked := map[Point]struct{}{}
+	queue := []Point{m.Point}
+
+	for len(queue) != 0 {
+		cur := queue[0]
+		queue = queue[1:]
+
+		if _, ok := checked[cur]; ok {
+			continue
+		}
+		checked[cur] = struct{}{}
+
+		for _, v := range cur.getNeighbors() {
+			c, _ := g.getCellStatus(v)
+			if c == EMPTYLAND {
+				return true
+			} else if c == attacker {
+				queue = append(queue, v)
+			}
+		}
+	}
+
+	return false
 }
 
 func (g GameTable) Count() (int, int) {
@@ -179,34 +219,33 @@ func (g GameTable) Count() (int, int) {
 
 func (g *GameTable) MakeMove(p Move) int {
 	g.Record = append(g.Record, p)
+	attackerColor, _ := g.getPlayerColor()
 
 	if p.Pass {
 		if len(g.Record) >= 2 && g.Record[len(g.Record)-2].Pass {
 			blue, orange := g.Count()
-			g.Result = fmt.Sprint(blue, ":", orange, "(2.5)")
+			g.Result = fmt.Sprint(blue, ":", orange+2, ".5")
 			if blue > orange+2 {
 				return 0
 			} else {
 				return 1
 			}
 		} else {
-			g.Turn++
 			return -1
 		}
 	}
 
-	attackerColor, _ := g.getPlayerColor()
 	g.putPiece(p.Point, attackerColor)
 
 	sieged := false
 	for _, n := range p.Point.getNeighbors() {
-		if s := g.checkSieged(n); s != nil {
+		if s := g.checkSideSieged(n); s != nil {
 			for c := range s {
 				g.putPiece(c, SIEGED)
 				sieged = true
 			}
 		}
-		if o := g.checkOccupied(n); o != nil {
+		if o := g.checkSideOccupied(n); o != nil {
 			for c := range o {
 				g.putPiece(c, attackerColor+TERRITORYOFFSET)
 			}
@@ -215,11 +254,10 @@ func (g *GameTable) MakeMove(p Move) int {
 
 	// if sieged game over
 	if sieged {
-		if (g.Turn-1)%2 == 0 {
-			g.Result = "blue besieged opponent"
+		g.Result = "SIEGED"
+		if len(g.Record)%2 == 1 {
 			return 0
 		} else {
-			g.Result = "orange besieged opponent"
 			return 1
 		}
 	}
@@ -235,14 +273,14 @@ func (g *GameTable) MakeMove(p Move) int {
 	}
 	if empty == 0 {
 		blue, orange := g.Count()
-		g.Result = fmt.Sprint(blue, ":", orange, "(+2.5)")
 		if blue > orange+2 {
+			g.Result = fmt.Sprint(blue, ":", orange+2, ".5")
 			return 0
 		} else {
+			g.Result = fmt.Sprint(blue, ":", orange+2, ".5")
 			return 1
 		}
 	}
 
-	g.Turn++
 	return -1
 }
