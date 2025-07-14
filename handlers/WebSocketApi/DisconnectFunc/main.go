@@ -4,6 +4,7 @@ import (
 	"context"
 	"great-kingdom-lambda/lib/ddb"
 	"great-kingdom-lambda/lib/sqs"
+	"great-kingdom-lambda/lib/sugarlogger"
 	"great-kingdom-lambda/lib/vars"
 	"great-kingdom-lambda/lib/ws"
 
@@ -16,6 +17,8 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
+
+	sugarlogger.GetSugar().Info("disconnect ", conn.UserId, conn.Id)
 
 	if conn.GameTableId == "globalchat" {
 		conns, err := ddb.NewConnectionRepository().Query(ctx)

@@ -17,17 +17,17 @@ const (
 
 const TERRITORYOFFSET = 2
 
-type Point struct {
+type Cell struct {
 	R, C int
 }
 
-func (p Point) getNeighbors() []Point {
-	return []Point{{p.R, p.C - 1}, {p.R, p.C + 1}, {p.R - 1, p.C}, {p.R + 1, p.C}}
+func (p Cell) getNeighbors() []Cell {
+	return []Cell{{p.R, p.C - 1}, {p.R, p.C + 1}, {p.R - 1, p.C}, {p.R + 1, p.C}}
 }
 
 type Move struct {
-	Point Point
-	Pass  bool
+	Cell Cell
+	Pass bool
 }
 
 type GameTable struct {
@@ -44,11 +44,11 @@ func NewGameTable() *GameTable {
 	return g
 }
 
-func (g *GameTable) putPiece(p Point, s CellStatus) {
+func (g *GameTable) putPiece(p Cell, s CellStatus) {
 	g.Board[p.R][p.C] = s
 }
 
-func (g GameTable) getCellStatus(p Point) (cell CellStatus, edge int) {
+func (g GameTable) getCellStatus(p Cell) (cell CellStatus, edge int) {
 	if p.R < 0 {
 		return EDGE, 0
 	}
@@ -74,14 +74,14 @@ func (g GameTable) getPlayerColor() (attacker CellStatus, defenser CellStatus) {
 }
 
 // given point is side of moved point
-func (g GameTable) checkSideSieged(side Point) map[Point]struct{} {
+func (g GameTable) checkSideSieged(side Cell) map[Cell]struct{} {
 	attackerColor, defenserColor := g.getPlayerColor()
 	if c, _ := g.getCellStatus(side); c != defenserColor {
 		return nil
 	}
 
-	checked := map[Point]struct{}{}
-	queue := []Point{side}
+	checked := map[Cell]struct{}{}
+	queue := []Cell{side}
 	edgeCheck := [4]bool{}
 
 	for len(queue) > 0 {
@@ -113,14 +113,14 @@ func (g GameTable) checkSideSieged(side Point) map[Point]struct{} {
 	return checked
 }
 
-func (g GameTable) checkSideOccupied(side Point) map[Point]struct{} {
+func (g GameTable) checkSideOccupied(side Cell) map[Cell]struct{} {
 	attackerColor, _ := g.getPlayerColor()
 	if c, _ := g.getCellStatus(side); c != EMPTYLAND {
 		return nil
 	}
 
-	checked := map[Point]struct{}{}
-	queue := []Point{side}
+	checked := map[Cell]struct{}{}
+	queue := []Cell{side}
 	edgeCheck := [4]bool{}
 
 	for len(queue) > 0 {
@@ -156,7 +156,7 @@ func (g GameTable) Playable(m Move) bool {
 	if m.Pass {
 		return true
 	}
-	c, _ := g.getCellStatus(m.Point)
+	c, _ := g.getCellStatus(m.Cell)
 	if c != EMPTYLAND {
 		return false
 	}
@@ -168,17 +168,17 @@ func (g GameTable) Playable(m Move) bool {
 		attacker, _ = ORANGECASTLE, BLUECASTLE
 	}
 
-	g.putPiece(m.Point, attacker)
+	g.putPiece(m.Cell, attacker)
 	g.Record = append(g.Record, m)
 
-	for _, n := range m.Point.getNeighbors() {
+	for _, n := range m.Cell.getNeighbors() {
 		if s := g.checkSideSieged(n); s != nil {
 			return true
 		}
 	}
 
-	checked := map[Point]struct{}{}
-	queue := []Point{m.Point}
+	checked := map[Cell]struct{}{}
+	queue := []Cell{m.Cell}
 
 	for len(queue) != 0 {
 		cur := queue[0]
@@ -235,10 +235,10 @@ func (g *GameTable) MakeMove(p Move) int {
 		}
 	}
 
-	g.putPiece(p.Point, attackerColor)
+	g.putPiece(p.Cell, attackerColor)
 
 	sieged := false
-	for _, n := range p.Point.getNeighbors() {
+	for _, n := range p.Cell.getNeighbors() {
 		if s := g.checkSideSieged(n); s != nil {
 			for c := range s {
 				g.putPiece(c, SIEGED)
